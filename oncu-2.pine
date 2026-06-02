@@ -1,0 +1,12 @@
+study(title="Ö N C Ü 2", shorttitle="Ö N C Ü 2")
+length = input(5, minval=1), smoothK = input(3, minval=1), smoothD = input(3, minval=1)
+k = ema(stoch(close, high, low, length), smoothK)
+d = ema(k, smoothD)
+plot(k, color=blue, linewidth=2)
+plot(d, color=green, linewidth=1)
+h0 = hline(80, color=black, linewidth=1)
+h1 = hline(20, color=black, linewidth=1)
+fill(h0, h1, color=lime, transp=90)
+
+plot(cross(d, k) ? d : na,color=black, style = circles, linewidth = 4)
+OutputSignal = k >= d ? 0 : 1

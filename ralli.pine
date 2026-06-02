@@ -1,0 +1,41 @@
+///@BorsaHocam
+study(title="RALLİ HABERCİSİ ", overlay=true)
+
+ema5 = ema(close, 5)
+ema9 = ema(close, 9)
+ema21 = ema(close, 21)
+ema50 = ema(close, 50)
+ema100 = ema(close, 100)
+ema200 = ema(close, 200)
+
+plot(ema5, title="ema5", color = black,linewidth =2)
+plot(ema9, title="ema9", color = purple,linewidth =2)
+plot(ema21, title = "ema21", color = red, linewidth = 2)
+plot(ema50, title = "ema50", color = green, linewidth = 2)
+plot(ema100, title = "ema100", color = orange, linewidth = 2)
+plot(ema200, title = "ema200", color = blue, linewidth = 2)
+
+plot(cross(ema5, ema9) and ema5[1] < ema9[1] ? ema5 : na, title=" AL 1", style=cross, linewidth=4, color=blue) // AL SİNYALİ
+plot(cross(ema9, ema21) and ema9[1] < ema21[1] ? ema9 : na, title=" AL 2", style=cross, linewidth=4, color=blue) // AL SİNYALİ
+plot(cross(ema50, ema200) and ema50[1] < ema200[1] ? ema50 : na, title="ALTIN RALLİ", style=cross, linewidth=4, color=blue) // golden cross
+plot(cross(ema21, ema50) and ema21[1] < ema50[1] ? ema21 : na, title="GÜMÜŞ RALLİ", style=cross, linewidth=4, color=blue) // silver cross
+plot(cross(ema21, ema50) and ema21[1] > ema50[1] ? ema50 : na, title="SAT 3", style=cross, linewidth=4, color=black)//DEATH CROSS
+plot(cross(ema9, ema21) and ema9[1] > ema21[1] ? ema9 : na, title="SAT 2", style=cross, linewidth=4, color=black) //DEATH CROSS
+plot(cross(ema100, ema200) and ema100[1] > ema200[1] ? ema100 : na, title="SON ŞANSIN SAT ", style=cross, linewidth=4, color=black) //DEATH CROSS
+plot(cross(ema50, ema200) and ema50[1] > ema200[1] ? ema50 : na, title="SATMAZSAN BATARSIN", style=cross, linewidth=4, color=black) //DEATH CROSS
+plot(cross(ema50, ema100) and ema50[1] > ema100[1] ? ema50 : na, title="SAT 4", style=cross, linewidth=4, color=black) //DEATH CROSS
+plot(cross(ema5, ema9) and ema5[1] > ema9[1] ? ema5 : na, title="SAT 1", style=cross, linewidth=4, color=black) //DEATH CROSS
+plot(cross(ema50, ema200) and ema50[1] < ema200[1] ? ema50 : na, title="RALLİ", style=cross, linewidth=4, color=blue) // golden cross
+plot(cross(ema100, ema200) and ema100[1] < ema200[1] ? ema100 : na, title="RALLİ", style=cross, linewidth=4, color=blue) // golden cross
+plot(cross(ema21, ema200) and ema21[1] < ema200[1] ? ema21 : na, title=" RALLİ", style=cross, linewidth=4, color=blue) // golden cross
+
+
+plotshape(cross(ema5, ema21) and ema5[1] < ema21[1] ? true : na, style=shape.triangleup, text="AL ",color=blue,size=size.small, location=location.belowbar,transp=0)
+plotshape(cross(ema50, ema200) and ema50[1] < ema200[1] ? true : na, style=shape.diamond, text="ALTIN RALLİ\nGOLDEN CROSS",color=orange,size=size.small, location=location.abovebar,transp=0)
+plotshape(cross(ema21, ema50) and ema21[1] < ema50[1] ? true : na, style=shape.diamond, text="GÜMÜŞ RALLİ\nSİLVER CROSS",color=blue,size=size.small, location=location.abovebar,transp=0)
+
+plotshape(cross(ema5, ema21) and ema5[1] > ema21[1] ? true : na, style=shape.triangledown, text="SAT ",color=black,size=size.small, location=location.abovebar,transp=0)
+
+plotshape(cross(ema50, ema200) and ema50[1] > ema200[1] ? true : na, style=shape.triangleup, text="SATMAZSAN BATARSIN\nDEATH CROSS",color=black,size=size.small, location=location.belowbar,transp=0)
+
+barcolor(cross(ema50, ema200) and ema50[1] < ema200[1] ? blue: cross(ema21, ema50) and ema21[1] < ema50[1] ? blue: close < open ? red: green)

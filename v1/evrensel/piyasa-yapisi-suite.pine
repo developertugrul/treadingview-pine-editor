@@ -1,0 +1,314 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║        PİYASA YAPISI PAKETİ — v6                            ║
+// ║  HH/HL/LH/LL · Break of Structure · Change of Character     ║
+// ║  Likidite Seviyeleri · Order Block Tespiti                   ║
+// ║  ► TÜM VARLIK SINIFLARI İÇİN KULLANILIR (EVRENSEL)          ║
+// ║  ► Önce bu dosyayı aç, trend yapısını anla, sonra diğerleri ║
+// ╚══════════════════════════════════════════════════════════════╝
+// NASIL KULLANILIR:
+// 1. Haftalık grafikte büyük yapıyı gör (HH/HL = uptrend)
+// 2. Günlük grafikte Break of Structure (BoS) ara
+// 3. BoS + momentum + skor → güçlü sinyal
+indicator("Piyasa Yapısı Paketi", overlay=true, max_bars_back=500,
+          max_labels_count=200, max_lines_count=200)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+C_BULL2  = is_dark ? color.new(#69F0AE, 0) : color.new(#1B5E20, 0)  // Açık yeşil
+C_BEAR2  = is_dark ? color.new(#FF6B6B, 0) : color.new(#7F0000, 0)  // Açık kırmızı
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_yapt = "── Piyasa Yapısı ──"
+yapt_on  = input.bool(true,  "HH/HL/LH/LL Etiketleri", group=grp_yapt)
+pivot_lb = input.int(10,     "Pivot Lookback",  minval=3, maxval=50, group=grp_yapt)
+pivot_rg = input.int(10,     "Pivot Sağ Bar",   minval=3, maxval=50, group=grp_yapt)
+
+grp_bos = "── Break of Structure (BoS) ──"
+bos_on   = input.bool(true,  "BoS Göster",   group=grp_bos)
+choch_on = input.bool(true,  "ChoCh Göster", group=grp_bos)
+
+grp_liq = "── Likidite Seviyeleri ──"
+liq_on   = input.bool(true,  "Equal H/L (Likidite) Göster", group=grp_liq)
+liq_tol  = input.float(0.003,"Eşitlik Toleransı (%)", minval=0.001, maxval=0.02, step=0.001, group=grp_liq)
+
+grp_ob = "── Order Block Tespiti ──"
+ob_on    = input.bool(true, "Order Block Göster", group=grp_ob)
+ob_lb    = input.int(3,     "OB Lookback (bar)", minval=1, maxval=10, group=grp_ob)
+
+grp_fvg = "── Fair Value Gap (FVG) ──"
+fvg_on   = input.bool(true, "FVG Göster", group=grp_fvg)
+
+// ══════════════════════════════════════════════════════════════
+// PİVOT HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+ph = ta.pivothigh(high, pivot_lb, pivot_rg)
+pl = ta.pivotlow(low,   pivot_lb, pivot_rg)
+
+// Son 4 pivot high ve low sakla
+var float[] phighs = array.new_float(4, na)
+var float[] plows  = array.new_float(4, na)
+var int[]   ph_bars = array.new_int(4, 0)
+var int[]   pl_bars = array.new_int(4, 0)
+
+if not na(ph)
+    array.unshift(phighs, ph)
+    array.unshift(ph_bars, bar_index - pivot_rg)
+    if array.size(phighs) > 4
+        array.pop(phighs)
+        array.pop(ph_bars)
+
+if not na(pl)
+    array.unshift(plows, pl)
+    array.unshift(pl_bars, bar_index - pivot_rg)
+    if array.size(plows) > 4
+        array.pop(plows)
+        array.pop(pl_bars)
+
+// ══════════════════════════════════════════════════════════════
+// PİYASA YAPISI TESPİTİ
+// ══════════════════════════════════════════════════════════════
+// Son 2 pivot high ve low
+ph1 = array.size(phighs) >= 1 ? array.get(phighs, 0) : na
+ph2 = array.size(phighs) >= 2 ? array.get(phighs, 1) : na
+pl1 = array.size(plows)  >= 1 ? array.get(plows,  0) : na
+pl2 = array.size(plows)  >= 2 ? array.get(plows,  1) : na
+
+// Trend yapısı
+hh = not na(ph1) and not na(ph2) and ph1 > ph2  // Higher High
+lh = not na(ph1) and not na(ph2) and ph1 < ph2  // Lower High
+hl = not na(pl1) and not na(pl2) and pl1 > pl2  // Higher Low
+ll = not na(pl1) and not na(pl2) and pl1 < pl2  // Lower Low
+
+// Trend durumu
+uptrend   = hh and hl   // HH + HL = Uptrend
+downtrend = lh and ll   // LH + LL = Downtrend
+
+// ══════════════════════════════════════════════════════════════
+// BREAK OF STRUCTURE (BoS) VE CHANGE OF CHARACTER (ChoCh)
+// ══════════════════════════════════════════════════════════════
+// BoS (Bullish): Fiyat son önemli Lower High'ı kırdı — trend değişimi
+// BoS (Bearish): Fiyat son önemli Higher Low'u kırdı — trend değişimi
+
+// Son confirmed pivot high/low kullan
+var float last_confirmed_ph = na
+var float last_confirmed_pl = na
+
+if not na(ph)
+    last_confirmed_ph := ph
+if not na(pl)
+    last_confirmed_pl := pl
+
+// Bullish BoS: Downtrend içinde önemli yüksek kırıldı
+bullish_bos = not na(last_confirmed_ph) and ta.crossover(close, last_confirmed_ph) and downtrend[1]
+
+// Bearish BoS: Uptrend içinde önemli düşük kırıldı
+bearish_bos = not na(last_confirmed_pl) and ta.crossunder(close, last_confirmed_pl) and uptrend[1]
+
+// ChoCh (Change of Character): BoS öncesi momentum değişimi
+// Bullish ChoCh: İlk HL oluşumu (LH/LL trendinde ilk HL = karakteristik değişim)
+var bool prev_downtrend = false
+if downtrend : prev_downtrend := true
+
+bullish_choch = prev_downtrend and hl and not ll   // HL var ama henüz BoS değil
+bearish_choch = not uptrend[1] and lh and not hh  // LH oluştu ama henüz BoS değil
+
+// BoS sonrası durumu güncelle
+var float bos_level = na
+if bullish_bos : bos_level := last_confirmed_ph; prev_downtrend := false
+if bearish_bos : bos_level := last_confirmed_pl; prev_downtrend := true
+
+// ══════════════════════════════════════════════════════════════
+// LİKİDİTE SEVİYELERİ (Equal Highs / Equal Lows)
+// ══════════════════════════════════════════════════════════════
+// Eşit yüksekler = Yukarıda likidite toplanıyor (sweep hedefi)
+// Eşit düşükler  = Aşağıda likidite toplanıyor
+
+equal_high = not na(ph1) and not na(ph2) and math.abs(ph1 - ph2) / ph2 < liq_tol
+equal_low  = not na(pl1) and not na(pl2) and math.abs(pl1 - pl2) / pl2 < liq_tol
+
+// ══════════════════════════════════════════════════════════════
+// ORDER BLOCK TESPİTİ
+// ══════════════════════════════════════════════════════════════
+// Bullish OB: Oluşturdan sonra güçlü yükseliş olan son bearish mum
+// Bearish OB: Oluşturdan sonra güçlü düşüş olan son bullish mum
+
+// Güçlü hareket = Son N barda belirli mesafe katedildi
+atr_v = ta.atr(14)
+strong_up   = close > close[ob_lb] + atr_v * 1.5
+strong_down = close < close[ob_lb] - atr_v * 1.5
+
+// Bullish OB: Güçlü yükseliş öncesi son bearish mum
+var float bull_ob_high = na, var float bull_ob_low = na, var int bull_ob_bar = 0
+var float bear_ob_high = na, var float bear_ob_low = na, var int bear_ob_bar = 0
+
+if strong_up and close[ob_lb] < open[ob_lb]  // ob_lb bar önce bearish mum vardı
+    bull_ob_high := high[ob_lb]
+    bull_ob_low  := low[ob_lb]
+    bull_ob_bar  := bar_index - ob_lb
+
+if strong_down and close[ob_lb] > open[ob_lb]  // ob_lb bar önce bullish mum vardı
+    bear_ob_high := high[ob_lb]
+    bear_ob_low  := low[ob_lb]
+    bear_ob_bar  := bar_index - ob_lb
+
+// ══════════════════════════════════════════════════════════════
+// FAIR VALUE GAP (FVG / IMBALANCE)
+// ══════════════════════════════════════════════════════════════
+// Bullish FVG: Mum[2] high < Mum[0] low — boşluk var, dolabilir
+// Bearish FVG: Mum[2] low > Mum[0] high
+bull_fvg = low > high[2]   // Bullish FVG
+bear_fvg = high < low[2]   // Bearish FVG
+
+bull_fvg_filled = low <= high[2]  // Doluyor
+bear_fvg_filled = high >= low[2]  // Doluyor
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — HH/HL/LH/LL Etiketleri
+// ══════════════════════════════════════════════════════════════
+if yapt_on and not na(ph)
+    ph_col   = hh ? C_BULL : C_BEAR
+    ph_label = hh ? "HH" : "LH"
+    label.new(bar_index - pivot_rg, ph,
+              ph_label,
+              color=color.new(ph_col, 75),
+              textcolor=ph_col,
+              style=label.style_label_down,
+              size=size.tiny)
+
+if yapt_on and not na(pl)
+    pl_col   = hl ? C_BULL : C_BEAR
+    pl_label = hl ? "HL" : "LL"
+    label.new(bar_index - pivot_rg, pl,
+              pl_label,
+              color=color.new(pl_col, 75),
+              textcolor=pl_col,
+              style=label.style_label_up,
+              size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Break of Structure
+// ══════════════════════════════════════════════════════════════
+plotshape(bos_on and bullish_bos, "Bullish BoS",
+          shape.labelup, location.belowbar, C_BULL,
+          text="BoS ↑", textcolor=C_BULL, size=size.small)
+plotshape(bos_on and bearish_bos, "Bearish BoS",
+          shape.labeldown, location.abovebar, C_BEAR,
+          text="BoS ↓", textcolor=C_BEAR, size=size.small)
+
+// BoS seviyesi çizgisi
+if bos_on and (bullish_bos or bearish_bos)
+    bos_col = bullish_bos ? C_BULL : C_BEAR
+    line.new(bar_index - 10, bos_level, bar_index, bos_level,
+             color=color.new(bos_col, 40), style=line.style_dashed, width=2)
+
+// ChoCh
+plotshape(choch_on and bullish_choch, "Bull ChoCh",
+          shape.triangleup, location.belowbar, color.new(C_BULL, 30),
+          text="CHoCh", textcolor=color.new(C_BULL, 20), size=size.tiny)
+plotshape(choch_on and bearish_choch, "Bear ChoCh",
+          shape.triangledown, location.abovebar, color.new(C_BEAR, 30),
+          text="CHoCh", textcolor=color.new(C_BEAR, 20), size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Likidite Seviyeleri
+// ══════════════════════════════════════════════════════════════
+if liq_on and equal_high and not na(ph1)
+    line.new(bar_index - pivot_lb * 3, ph1, bar_index, ph1,
+             color=color.new(C_BEAR, 40), style=line.style_dotted, width=2)
+    label.new(bar_index, ph1, "EQH",
+              color=color.new(C_BEAR, 60), textcolor=C_BEAR,
+              style=label.style_label_left, size=size.tiny)
+
+if liq_on and equal_low and not na(pl1)
+    line.new(bar_index - pivot_lb * 3, pl1, bar_index, pl1,
+             color=color.new(C_BULL, 40), style=line.style_dotted, width=2)
+    label.new(bar_index, pl1, "EQL",
+              color=color.new(C_BULL, 60), textcolor=C_BULL,
+              style=label.style_label_left, size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Order Blocks
+// ══════════════════════════════════════════════════════════════
+// Bullish OB (yeşil kutu)
+if ob_on and not na(bull_ob_high) and bar_index - bull_ob_bar < 50
+    box.new(bull_ob_bar, bull_ob_high, bar_index, bull_ob_low,
+            border_color=color.new(C_BULL, 20),
+            bgcolor=color.new(C_BULL, 88),
+            border_width=1)
+
+// Bearish OB (kırmızı kutu)
+if ob_on and not na(bear_ob_high) and bar_index - bear_ob_bar < 50
+    box.new(bear_ob_bar, bear_ob_high, bar_index, bear_ob_low,
+            border_color=color.new(C_BEAR, 20),
+            bgcolor=color.new(C_BEAR, 88),
+            border_width=1)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Fair Value Gap
+// ══════════════════════════════════════════════════════════════
+bgcolor(fvg_on and bull_fvg ? color.new(C_BULL, 93) : na, title="Bullish FVG")
+bgcolor(fvg_on and bear_fvg ? color.new(C_BEAR, 93) : na, title="Bearish FVG")
+
+plotshape(fvg_on and bull_fvg, "Bull FVG", shape.circle,
+          location.belowbar, color.new(C_BULL, 50), size=size.tiny)
+plotshape(fvg_on and bear_fvg, "Bear FVG", shape.circle,
+          location.abovebar, color.new(C_BEAR, 50), size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// TREND YAPISI ETİKETİ
+// ══════════════════════════════════════════════════════════════
+if barstate.islast
+    yapi_txt = uptrend   ? "▲ UPTREND (HH+HL)" :
+               downtrend ? "▼ DOWNTREND (LH+LL)" :
+               hh and ll ? "↔ KARARSIZ (HH+LL)" :
+               lh and hl ? "↔ KARARSIZ (LH+HL)" :
+               "~ Yapı Belirsiz"
+
+    yapi_col = uptrend ? C_BULL : downtrend ? C_BEAR : C_WARN
+
+    label.new(bar_index + 2, high,
+              yapi_txt + "\n" +
+              (bullish_bos ? "⚡ Bullish BoS oluştu!" :
+               bearish_bos ? "⚡ Bearish BoS oluştu!" :
+               equal_high  ? "⚠️ EQH — Likidite üstte" :
+               equal_low   ? "⚠️ EQL — Likidite altta" : ""),
+              color=color.new(yapi_col, 80),
+              textcolor=yapi_col,
+              style=label.style_label_left,
+              size=size.normal)
+
+// ══════════════════════════════════════════════════════════════
+// BAR RENKLENDİRME — Trend yapısına göre
+// ══════════════════════════════════════════════════════════════
+barcolor(uptrend   ? color.new(C_BULL, 80) :
+         downtrend ? color.new(C_BEAR, 80) :
+         color.new(C_NEUT, 90), title="Yapı Bar Rengi")
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(bullish_bos, "Bullish BoS",  "🚀 BULLISH BREAK OF STRUCTURE | {{ticker}} @ {{close}}")
+alertcondition(bearish_bos, "Bearish BoS",  "💥 BEARISH BREAK OF STRUCTURE | {{ticker}} @ {{close}}")
+alertcondition(bullish_choch,"Bull ChoCh",  "🔄 Bullish Change of Character | {{ticker}} @ {{close}}")
+alertcondition(equal_high,   "EQH Likidite","⚠️ Equal Highs — Üstte Likidite | {{ticker}}")
+alertcondition(equal_low,    "EQL Likidite","⚠️ Equal Lows — Altta Likidite | {{ticker}}")
+alertcondition(bull_fvg,     "Bullish FVG", "📊 Bullish FVG Oluştu | {{ticker}}")
+alertcondition(bear_fvg,     "Bearish FVG", "📊 Bearish FVG Oluştu | {{ticker}}")
+
+if barstate.isconfirmed
+    if bullish_bos
+        alert('{"event":"BULLISH_BOS","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+    if bearish_bos
+        alert('{"event":"BEARISH_BOS","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)

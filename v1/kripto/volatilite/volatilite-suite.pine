@@ -1,0 +1,119 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         KRİPTO VOLATİLİTE PAKETİ — v6                       ║
+// ║  Bollinger Bands (2.5) · Keltner (2.0) · Squeeze · ATR      ║
+// ║  Kripto için genişletilmiş band parametreleri                ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Kripto Volatilite Paketi", overlay=true, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00E676, 0) : color.new(#00701A, 0)
+C_BEAR   = is_dark ? color.new(#FF1744, 0) : color.new(#B71C1C, 0)
+C_NEUT   = is_dark ? color.new(#9E9E9E, 0) : color.new(#424242, 0)
+C_ACCENT = is_dark ? color.new(#40C4FF, 0) : color.new(#0277BD, 0)
+C_WARN   = is_dark ? color.new(#FFD740, 0) : color.new(#F57F17, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS — Kripto için default çarpanlar daha geniş
+// ══════════════════════════════════════════════════════════════
+grp_bb = "── Bollinger Bands ──"
+bb_on   = input.bool(true,  "BB Göster", group=grp_bb)
+bb_per  = input.int(20,     "BB Periyot", minval=5, group=grp_bb)
+bb_mult = input.float(2.5,  "BB Çarpan (Kripto: 2.5 önerilir)", minval=0.5, maxval=5.0, step=0.1, group=grp_bb)
+bb_src  = input.source(close, "Kaynak", group=grp_bb)
+
+grp_kc = "── Keltner Channel ──"
+kc_on   = input.bool(true,  "KC Göster", group=grp_kc)
+kc_per  = input.int(20,     "KC Periyot", minval=5, group=grp_kc)
+kc_mult = input.float(2.0,  "KC ATR Çarpan (Kripto: 2.0)", minval=0.5, maxval=5.0, step=0.1, group=grp_kc)
+
+grp_sq = "── Squeeze ──"
+sq_on = input.bool(true, "Squeeze Tespiti", group=grp_sq)
+
+grp_atr = "── ATR ──"
+atr_on   = input.bool(true,  "ATR Bantları", group=grp_atr)
+atr_per  = input.int(14,     "ATR Periyot",  minval=2, group=grp_atr)
+atr_mult = input.float(2.5,  "ATR Çarpan (Kripto: 2.5)", minval=0.5, maxval=5.0, step=0.1, group=grp_atr)
+
+// ══════════════════════════════════════════════════════════════
+// HESAPLAMALAR
+// ══════════════════════════════════════════════════════════════
+bb_basis  = ta.sma(bb_src, bb_per)
+bb_dev    = bb_mult * ta.stdev(bb_src, bb_per)
+bb_upper  = bb_basis + bb_dev
+bb_lower  = bb_basis - bb_dev
+bb_width  = (bb_upper - bb_lower) / bb_basis
+bb_pct_b  = bb_upper - bb_lower > 0 ? (close - bb_lower) / (bb_upper - bb_lower) : 0.5
+bb_width_pct = ta.percentrank(bb_width, 50)
+
+kc_atr    = ta.atr(kc_per)
+kc_basis  = ta.ema(close, kc_per)
+kc_upper  = kc_basis + kc_mult * kc_atr
+kc_lower  = kc_basis - kc_mult * kc_atr
+
+// Squeeze
+squeeze_aktif = bb_upper < kc_upper and bb_lower > kc_lower
+sq_basladi    = squeeze_aktif  and not squeeze_aktif[1]
+sq_bitti      = not squeeze_aktif and squeeze_aktif[1]
+
+// Squeeze momentum
+sq_momentum   = ta.linreg(close - ta.sma(math.max(high - low, math.abs(high - close[1]), math.abs(low - close[1])), kc_per) * 0.5, kc_per, 0)
+vol_up   = sq_bitti and sq_momentum > 0
+vol_down = sq_bitti and sq_momentum < 0
+
+// ATR
+atr_val   = ta.atr(atr_per)
+atr_upper = close + atr_val * atr_mult
+atr_lower = close - atr_val * atr_mult
+
+bb_break_up   = ta.crossover(close,  bb_upper)
+bb_break_down = ta.crossunder(close, bb_lower)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT
+// ══════════════════════════════════════════════════════════════
+bb_band_col  = squeeze_aktif ? color.new(C_WARN, 25) : color.new(C_ACCENT, 40)
+bb_u = plot(bb_on ? bb_upper : na, "BB Üst",  color=bb_band_col, linewidth=1)
+bb_l = plot(bb_on ? bb_lower : na, "BB Alt",  color=bb_band_col, linewidth=1)
+       plot(bb_on ? bb_basis : na, "BB Orta", color=color.new(C_NEUT, 60), linewidth=1, style=plot.style_circles)
+
+fill(bb_u, bb_l, color=bb_on ? (squeeze_aktif ? color.new(C_WARN, 90) : color.new(C_ACCENT, 94)) : na)
+
+kc_col = color.new(C_NEUT, 65)
+kc_u = plot(kc_on ? kc_upper : na, "KC Üst", color=kc_col, linewidth=1)
+kc_l = plot(kc_on ? kc_lower : na, "KC Alt", color=kc_col, linewidth=1)
+       plot(kc_on ? kc_basis : na, "KC Orta",color=color.new(C_NEUT, 80), linewidth=1)
+
+plot(atr_on ? atr_upper : na, "ATR Üst", color=color.new(C_BEAR, 70), linewidth=1, style=plot.style_stepline)
+plot(atr_on ? atr_lower : na, "ATR Alt", color=color.new(C_BULL, 70), linewidth=1, style=plot.style_stepline)
+
+plotchar(sq_on and squeeze_aktif, "Squeeze", "◆", location.top, color.new(C_WARN, 40), size=size.tiny)
+plotshape(sq_on and vol_up,   "Patlama ↑", shape.triangleup,   location.belowbar, C_BULL, size=size.large)
+plotshape(sq_on and vol_down, "Patlama ↓", shape.triangledown, location.abovebar, C_BEAR, size=size.large)
+plotshape(bb_break_up,   "BB Kır ↑", shape.arrowup,   location.top,    C_BULL, size=size.small)
+plotshape(bb_break_down, "BB Kır ↓", shape.arrowdown, location.bottom, C_BEAR, size=size.small)
+
+if barstate.islast
+    label.new(bar_index + 2, bb_upper,
+              "Kripto Volatilite\n" +
+              "BB %B: " + str.tostring(bb_pct_b * 100,"#.#") + "%\n" +
+              "Band Persentil: " + str.tostring(bb_width_pct,"#.#") + "\n" +
+              "ATR: " + str.tostring(atr_val,"#.##") + "\n" +
+              (squeeze_aktif ? "⚡SIKIŞ!" : "Serbest"),
+              color=color.new(bb_width_pct <= 30 ? C_WARN : C_NEUT, 80),
+              textcolor=bb_width_pct <= 30 ? C_WARN : C_NEUT,
+              style=label.style_label_left, size=size.small)
+
+alertcondition(sq_basladi,  "Squeeze Başladı",  "⚡ KRİPTO SIKIŞ! | {{ticker}}")
+alertcondition(vol_up,      "Yukarı Patlama",   "🚀 KRİPTO PATLAMA ↑ | {{ticker}} @ {{close}}")
+alertcondition(vol_down,    "Aşağı Patlama",    "💥 KRİPTO PATLAMA ↓ | {{ticker}} @ {{close}}")
+alertcondition(bb_break_up, "BB Kırılım ↑",     "🟢 BB Üst Kırılım | {{ticker}} @ {{close}}")
+
+if barstate.isconfirmed and (vol_up or vol_down)
+    yon = vol_up ? "YUKARI" : "ASAGI"
+    alert('{"event":"KRIPTO_SQUEEZE_PATLAMA","ticker":"' + syminfo.ticker + '","yon":"' + yon + '","price":' + str.tostring(close) + ',"atr":' + str.tostring(atr_val,"#.##") + '}', alert.freq_once_per_bar_close)

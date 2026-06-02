@@ -1,0 +1,140 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         EMTİA MOMENTUM PAKETİ — v6                          ║
+// ║  RSI · MACD · Stochastic · ATR Tabanlı Hacim Analizi        ║
+// ║  Birlikte Çalışır: trend-suite · korelasyon-suite            ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Emtia Momentum Paketi", overlay=false, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#FFD700, 0) : color.new(#B8860B, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#81C784, 0) : color.new(#2E7D32, 0)
+C_WARN   = is_dark ? color.new(#FF9800, 0) : color.new(#E65100, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+rsi_per  = input.int(14,  "RSI Periyot", minval=2, maxval=50)
+macd_on  = input.bool(true,"MACD Göster")
+stoch_on = input.bool(true,"Stochastic Göster")
+div_on   = input.bool(true,"Diverjans Tespiti")
+div_lb   = input.int(5,    "Diverjans Lookback", minval=2, maxval=20)
+
+// ══════════════════════════════════════════════════════════════
+// RSI
+// ══════════════════════════════════════════════════════════════
+rsi_val  = ta.rsi(close, rsi_per)
+rsi_ema  = ta.ema(rsi_val, 9)
+rsi_avg  = ta.sma(rsi_val, 50)
+rsi_std  = ta.stdev(rsi_val, 50)
+ob_aktif = math.min(rsi_avg + rsi_std * 1.5, 82.0)
+os_aktif = math.max(rsi_avg - rsi_std * 1.5, 18.0)
+
+rsi_asiri_alim  = rsi_val >= ob_aktif
+rsi_asiri_satim = rsi_val <= os_aktif
+rsi_ob_cikis = ta.crossunder(rsi_val, ob_aktif)
+rsi_os_cikis = ta.crossover(rsi_val,  os_aktif)
+
+// Diverjans
+price_ph = ta.pivothigh(high, div_lb, div_lb)
+price_pl = ta.pivotlow(low,   div_lb, div_lb)
+rsi_ph   = ta.pivothigh(rsi_val, div_lb, div_lb)
+rsi_pl   = ta.pivotlow(rsi_val,  div_lb, div_lb)
+var float pph = na, var float rph = na
+var float ppl = na, var float rpl = na
+if not na(price_ph) and not na(rsi_ph) : pph := price_ph; rph := rsi_ph
+if not na(price_pl) and not na(rsi_pl) : ppl := price_pl; rpl := rsi_pl
+bearish_div = div_on and not na(price_ph) and not na(rsi_ph) and not na(pph) and price_ph > pph and rsi_ph < rph
+bullish_div = div_on and not na(price_pl) and not na(rsi_pl) and not na(ppl) and price_pl < ppl and rsi_pl > rpl
+
+// ══════════════════════════════════════════════════════════════
+// MACD
+// ══════════════════════════════════════════════════════════════
+[macd_l, macd_s, macd_h] = ta.macd(close, 12, 26, 9)
+macd_pozitif    = macd_h > 0
+macd_yukari     = macd_h > macd_h[1]
+macd_cross_up   = ta.crossover(macd_l,  macd_s)
+macd_cross_down = ta.crossunder(macd_l, macd_s)
+macd_avg  = ta.sma(macd_h, 100)
+macd_std  = ta.stdev(macd_h, 100)
+macd_z    = macd_std != 0 ? (macd_h - macd_avg) / macd_std : 0.0
+macd_norm = math.max(0.0, math.min(100.0, 50.0 + macd_z * 15.0))
+
+// ══════════════════════════════════════════════════════════════
+// STOCHASTIC
+// ══════════════════════════════════════════════════════════════
+stoch_k_val = ta.sma(ta.stoch(close, high, low, 14), 3)
+stoch_d_val = ta.sma(stoch_k_val, 3)
+stoch_cross_up   = ta.crossover(stoch_k_val,  stoch_d_val) and stoch_k_val < 30
+stoch_cross_down = ta.crossunder(stoch_k_val, stoch_d_val) and stoch_k_val > 70
+
+// ══════════════════════════════════════════════════════════════
+// HACİM VE ATR BAZLI GÜÇ ANALİZİ
+// ══════════════════════════════════════════════════════════════
+vol_avg  = ta.sma(volume, 20)
+rel_vol  = vol_avg > 0 ? volume / vol_avg : 1.0
+vol_spike = rel_vol >= 2.0
+obv_val  = ta.obv
+obv_ema  = ta.ema(obv_val, 20)
+obv_yukari = obv_val > obv_ema
+
+// ══════════════════════════════════════════════════════════════
+// SKOR
+// ══════════════════════════════════════════════════════════════
+skor_raw = (rsi_val>50?20:-20) + (macd_pozitif?20:-20) + (macd_yukari?10:-10) +
+           (obv_yukari?15:-15) + (rsi_asiri_satim?10:0)
+momentum_skor = math.max(0.0, math.min(100.0, 50.0 + skor_raw * (50.0/75.0)))
+skor_rengi = momentum_skor >= 65 ? C_ACCENT : momentum_skor <= 35 ? C_BEAR : C_WARN
+
+// ══════════════════════════════════════════════════════════════
+// PLOT
+// ══════════════════════════════════════════════════════════════
+rsi_col = rsi_asiri_alim ? C_BEAR : rsi_asiri_satim ? C_ACCENT : C_BULL
+plot(rsi_val, "RSI", color=rsi_col, linewidth=2)
+plot(rsi_ema, "RSI EMA", color=color.new(C_WARN,20), linewidth=1)
+
+ob_p = plot(ob_aktif, "OB", color=color.new(C_BEAR,60), linewidth=1)
+os_p = plot(os_aktif, "OS", color=color.new(C_ACCENT,60), linewidth=1)
+       plot(50, "50",        color=color.new(C_NEUT,70), linewidth=1)
+fill(ob_p, plot(100,display=display.none), color=color.new(C_BEAR,92))
+fill(os_p, plot(0,  display=display.none), color=color.new(C_ACCENT,92))
+
+r_p = plot(rsi_val, display=display.none)
+e_p = plot(rsi_ema, display=display.none)
+fill(r_p, e_p, color=rsi_val>rsi_ema?color.new(C_ACCENT,82):color.new(C_BEAR,82))
+
+plotshape(rsi_ob_cikis, "OB Çıkış", shape.triangledown, location.top,    C_BEAR,   size=size.tiny)
+plotshape(rsi_os_cikis, "OS Çıkış", shape.triangleup,   location.bottom, C_ACCENT, size=size.tiny)
+plotshape(bearish_div,  "Bear Div", shape.xcross,  location.top,    C_BEAR,   size=size.small)
+plotshape(bullish_div,  "Bull Div", shape.circle,  location.bottom, C_ACCENT, size=size.small)
+
+macd_h_col = macd_pozitif and macd_yukari ? color.new(C_ACCENT,20) : macd_pozitif ? color.new(C_ACCENT,60) : not macd_yukari ? color.new(C_BEAR,20) : color.new(C_BEAR,60)
+plot(macd_on ? macd_norm : na, "MACD", color=macd_h_col, linewidth=2, style=plot.style_histogram)
+plotshape(macd_on and macd_cross_up,   "MACD Al",  shape.triangleup,   location.bottom, C_ACCENT, size=size.tiny)
+plotshape(macd_on and macd_cross_down, "MACD Sat", shape.triangledown, location.top,    C_BEAR,   size=size.tiny)
+
+plot(stoch_on ? stoch_k_val : na, "Stoch %K", color=color.new(C_BULL,0),  linewidth=1)
+plot(stoch_on ? stoch_d_val : na, "Stoch %D", color=color.new(C_WARN,30), linewidth=1)
+
+plot(momentum_skor, "Skor", color=color.new(skor_rengi,50), linewidth=1, style=plot.style_stepline)
+bgcolor(vol_spike ? color.new(C_WARN, 90) : na, title="Hacim Spike")
+
+if barstate.islast
+    label.new(bar_index+2, rsi_val,
+              "RSI:" + str.tostring(rsi_val,"#.#") + (rsi_asiri_alim?" [OB]":rsi_asiri_satim?" [OS]":"") + "\n" +
+              "MACD: " + (macd_pozitif?"POZ":"NEG") + " | Hacim: " + (vol_spike?"⚡SPIKE":"Normal") + "\n" +
+              "Skor: " + str.tostring(momentum_skor,"#") + "/100",
+              color=color.new(skor_rengi,80), textcolor=skor_rengi, style=label.style_label_left, size=size.small)
+
+alertcondition(rsi_os_cikis,  "RSI OS",    "🟡 Emtia RSI OS Çıkış | {{ticker}}")
+alertcondition(bullish_div,   "Bull Div",  "🟡 Emtia Bullish Div | {{ticker}} @ {{close}}")
+alertcondition(bearish_div,   "Bear Div",  "🔴 Emtia Bearish Div | {{ticker}} @ {{close}}")
+alertcondition(macd_cross_up, "MACD Al",   "🟡 Emtia MACD Al | {{ticker}}")
+alertcondition(vol_spike,     "Hacim Spike","⚡ Emtia Hacim Spike | {{ticker}}")

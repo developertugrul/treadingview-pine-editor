@@ -1,0 +1,164 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         EMTİA TREND PAKETİ — v6                             ║
+// ║  EMA · SuperTrend · 52 Haftalık H/L · S/R · MTF             ║
+// ║  Altın · Gümüş · Petrol · Bakır · Tarım Emtiaları           ║
+// ║  Birlikte Çalışır: korelasyon-suite · momentum-suite         ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Emtia Trend Paketi", overlay=true, max_bars_back=500, max_labels_count=50)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+// Emtia teması: Altın rengi tonları
+C_BULL   = is_dark ? color.new(#FFD700, 0) : color.new(#B8860B, 0)   // Altın rengi
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#81C784, 0) : color.new(#2E7D32, 0)   // Yeşil (emtia)
+C_WARN   = is_dark ? color.new(#FF9800, 0) : color.new(#E65100, 0)   // Turuncu (petrol)
+C_SILVER = is_dark ? color.new(#B0BEC5, 0) : color.new(#607D8B, 0)   // Gümüş rengi
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_ema = "── Hareketli Ortalamalar ──"
+ema20_on  = input.bool(true,  "EMA 20",   group=grp_ema)
+ema50_on  = input.bool(true,  "EMA 50",   group=grp_ema)
+ema100_on = input.bool(true,  "EMA 100",  group=grp_ema)
+ema200_on = input.bool(true,  "EMA 200",  group=grp_ema)
+bar_renk  = input.bool(true,  "Bar Renk", group=grp_ema)
+
+grp_st = "── SuperTrend ──"
+st_on   = input.bool(true,   "SuperTrend", group=grp_st)
+st_per  = input.int(14,      "Periyot (Emtia: 14 önerilir)", minval=3, group=grp_st)
+st_mult = input.float(3.0,   "Çarpan", minval=0.5, maxval=10, step=0.1, group=grp_st)
+
+grp_52w = "── 52 Haftalık Seviyeler ──"
+w52_on  = input.bool(true, "52 Haftalık High/Low Göster", group=grp_52w)
+
+grp_sr = "── Destek / Direnç ──"
+sr_on   = input.bool(true, "S/R Göster", group=grp_sr)
+sr_lb   = input.int(14,    "Pivot Lookback", minval=5, maxval=50, group=grp_sr)
+
+grp_mtf = "── MTF ──"
+mtf_tf  = input.timeframe("W", "Konfirmasyon TF (Emtia: Haftalık)", group=grp_mtf)
+
+// ══════════════════════════════════════════════════════════════
+// EMA
+// ══════════════════════════════════════════════════════════════
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+ema100 = ta.ema(close, 100)
+ema200 = ta.ema(close, 200)
+golden_cross = ta.crossover(ema50,  ema200)
+death_cross  = ta.crossunder(ema50, ema200)
+
+// ══════════════════════════════════════════════════════════════
+// SUPERTREND
+// ══════════════════════════════════════════════════════════════
+[st_val, st_dir] = ta.supertrend(st_mult, st_per)
+st_yukari = st_dir < 0
+st_alim   = ta.crossunder(st_dir, 0)
+st_satim  = ta.crossover(st_dir,  0)
+
+// ══════════════════════════════════════════════════════════════
+// 52 HAFTALIK HIGH/LOW (Yıllık referans seviyeleri)
+// ══════════════════════════════════════════════════════════════
+w52_bars = 52 * 5  // 52 hafta × 5 günlük barlar (daily grafikte)
+y_high = ta.highest(high, math.min(bar_index + 1, w52_bars))
+y_low  = ta.lowest(low,   math.min(bar_index + 1, w52_bars))
+
+// Yıllık seviyelere yakınlık
+atr_v  = ta.atr(14)
+near_y_high = math.abs(close - y_high) < atr_v * 1.0
+near_y_low  = math.abs(close - y_low)  < atr_v * 1.0
+
+// ══════════════════════════════════════════════════════════════
+// MTF
+// ══════════════════════════════════════════════════════════════
+[mtf_e50, mtf_e200] = request.security(syminfo.tickerid, mtf_tf,
+    [ta.ema(close,50), ta.ema(close,200)], lookahead=barmerge.lookahead_off)
+mtf_yukari = mtf_e50 > mtf_e200
+genel_yukari = st_yukari and mtf_yukari
+genel_asagi  = not st_yukari and not mtf_yukari
+
+// ══════════════════════════════════════════════════════════════
+// S/R
+// ══════════════════════════════════════════════════════════════
+ph = ta.pivothigh(high, sr_lb, sr_lb)
+pl = ta.pivotlow(low,   sr_lb, sr_lb)
+var float res1 = na, var float res2 = na
+var float sup1 = na, var float sup2 = na
+if not na(ph) : res2 := res1; res1 := ph
+if not na(pl) : sup2 := sup1; sup1 := pl
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — EMA
+// ══════════════════════════════════════════════════════════════
+c_e20  = is_dark ? color.new(#FFD700, 0) : color.new(#B8860B, 0)   // Altın
+c_e50  = is_dark ? color.new(#81C784, 0) : color.new(#2E7D32, 0)   // Yeşil
+c_e100 = is_dark ? color.new(#B0BEC5, 0) : color.new(#607D8B, 0)   // Gümüş
+c_e200 = is_dark ? color.new(#FF9800, 0) : color.new(#E65100, 0)   // Turuncu
+
+p_e20 = plot(ema20_on  ? ema20  : na, "EMA 20",  color=c_e20,  linewidth=1)
+p_e50 = plot(ema50_on  ? ema50  : na, "EMA 50",  color=c_e50,  linewidth=2)
+        plot(ema100_on ? ema100 : na, "EMA 100", color=c_e100, linewidth=2)
+        plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
+fill(p_e20, p_e50, color=ema20 > ema50 ? color.new(C_BULL,90) : color.new(C_BEAR,90))
+
+// SuperTrend
+plot(st_on ? st_val : na, "SuperTrend", color=st_yukari ? C_ACCENT : C_BEAR, linewidth=2)
+plotshape(st_on and st_alim,  "ST Al",  shape.triangleup,   location.belowbar, C_ACCENT, size=size.small)
+plotshape(st_on and st_satim, "ST Sat", shape.triangledown, location.abovebar, C_BEAR,   size=size.small)
+plotshape(golden_cross, "Golden Cross", shape.star,   location.belowbar, C_BULL, size=size.normal)
+plotshape(death_cross,  "Death Cross",  shape.xcross, location.abovebar, C_BEAR, size=size.normal)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — 52 Haftalık Seviyeler
+// ══════════════════════════════════════════════════════════════
+plot(w52_on ? y_high : na, "52H Zirve", color=color.new(C_BEAR, 25), linewidth=2, style=plot.style_circles)
+plot(w52_on ? y_low  : na, "52H Dip",   color=color.new(C_ACCENT,25), linewidth=2, style=plot.style_circles)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — S/R
+// ══════════════════════════════════════════════════════════════
+plot(sr_on ? res1 : na, "Direnç 1", color=color.new(C_BEAR, 25), linewidth=2)
+plot(sr_on ? res2 : na, "Direnç 2", color=color.new(C_BEAR, 60), linewidth=1)
+plot(sr_on ? sup1 : na, "Destek 1", color=color.new(C_ACCENT, 25), linewidth=2)
+plot(sr_on ? sup2 : na, "Destek 2", color=color.new(C_ACCENT, 60), linewidth=1)
+
+barcolor(bar_renk ? (genel_yukari ? color.new(C_BULL,65) : genel_asagi ? color.new(C_BEAR,65) : color.new(C_NEUT,80)) : na)
+
+if barstate.islast
+    y_high_dist = (y_high - close) / close * 100
+    y_low_dist  = (close - y_low)  / close * 100
+
+    trend_txt = genel_yukari ? "▲ YUKARI TREND" : genel_asagi ? "▼ AŞAĞI TREND" : "~ Kararsız"
+    trend_col = genel_yukari ? C_ACCENT : genel_asagi ? C_BEAR : C_NEUT
+
+    label.new(bar_index+2, high,
+              trend_txt + "\n" +
+              "52H Zirveye: " + str.tostring(y_high_dist,"#.#") + "%\n" +
+              "52H Dipten: "  + str.tostring(y_low_dist,"#.#")  + "%\n" +
+              "MTF(" + mtf_tf + "): " + (mtf_yukari ? "↑ Yükseliş" : "↓ Düşüş"),
+              color=color.new(trend_col,80), textcolor=trend_col,
+              style=label.style_label_left, size=size.small)
+
+if barstate.isconfirmed and near_y_high and w52_on
+    label.new(bar_index, high, "52H ZİRVE!", color=color.new(C_BEAR,60), textcolor=C_BEAR, style=label.style_label_down, size=size.small)
+if barstate.isconfirmed and near_y_low and w52_on
+    label.new(bar_index, low,  "52H DİP!",  color=color.new(C_ACCENT,60), textcolor=C_ACCENT, style=label.style_label_up, size=size.small)
+
+alertcondition(golden_cross,            "Golden Cross",     "🟡 EMTİA GOLDEN CROSS | {{ticker}} @ {{close}}")
+alertcondition(death_cross,             "Death Cross",      "🔴 EMTİA DEATH CROSS  | {{ticker}} @ {{close}}")
+alertcondition(st_alim,                 "ST Alım",          "🟡 EMTİA ST ALIM | {{ticker}} @ {{close}}")
+alertcondition(st_satim,                "ST Satım",         "🔴 EMTİA ST SATIM | {{ticker}} @ {{close}}")
+alertcondition(near_y_high and w52_on,  "52H Zirveye Yakın","⚠️ 52H Zirveye Yakın | {{ticker}}")
+alertcondition(near_y_low  and w52_on,  "52H Dibe Yakın",  "⚠️ 52H Dibe Yakın | {{ticker}}")
+
+if barstate.isconfirmed
+    if st_alim  : alert('{"event":"EMTIA_ST_ALIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)
+    if st_satim : alert('{"event":"EMTIA_ST_SATIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)

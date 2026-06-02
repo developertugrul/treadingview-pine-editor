@@ -1,0 +1,23 @@
+study(title="PM", shorttitle="TRB")
+length1 = input(14, minval=1, title="TTI")
+ma_length = input(13, minval=1, title="PMI")
+src = input(close, title="Source")
+ma1 = sma(src, length1)
+cci1 = (src - ma1) / (0.040 * dev(src, length1))
+//plot(cci1, color=black, linewidth=2)
+plot(cci1, linewidth=2)
+//plot(ema(cci1, ma_length), color=green, linewidth=2)
+plot(ema(cci1, ma_length), linewidth=2)
+
+plotColour = (cci1 > ema(cci1, ma_length)) ? blue : red
+plotCCIEMA = plot(series=cci1, color=plotColour, linewidth=3)
+//plotHoriz  = plot(series=0, color=black, style=circles)
+//fill(plot1=plotCCIEMA, plot2=plotHoriz, color=black, transp=90)
+
+
+band0 = hline(73, color=blue)
+band1 = hline(-73, color=blue)
+band2 = hline(0,title="zero")
+
+
+

@@ -1,0 +1,201 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         KURLAR SEANS PAKETİ — v6                            ║
+// ║  Tokyo · Londra · New York Seansları · Asian Range           ║
+// ║  Pivot Seviyeleri (R1/R2/S1/S2) · Seans Overlap Tespiti     ║
+// ║  SADECE KURLAR (Forex) için uygundur                        ║
+// ╚══════════════════════════════════════════════════════════════╝
+// NOT: TradingView grafik saat dilimi UTC olarak ayarlanmalıdır.
+// Semboller: EURUSD, USDTRY, GBPUSD, USDJPY, XAUUSD vb.
+indicator("Kurlar Seans Paketi", overlay=true, max_bars_back=500, max_boxes_count=200)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_seans = "── Seans Ayarları (UTC saati) ──"
+// Tokyo: 00:00-09:00 UTC
+tokyo_start = input.int(0,  "Tokyo Başlangıç (UTC saat)", minval=0, maxval=23, group=grp_seans)
+tokyo_end   = input.int(9,  "Tokyo Bitiş (UTC saat)",     minval=1, maxval=24, group=grp_seans)
+tokyo_on    = input.bool(true, "Tokyo Seansı Göster",     group=grp_seans)
+
+// Londra: 07:00-16:00 UTC
+londra_start = input.int(7,  "Londra Başlangıç (UTC)",    minval=0, maxval=23, group=grp_seans)
+londra_end   = input.int(16, "Londra Bitiş (UTC)",        minval=1, maxval=24, group=grp_seans)
+londra_on    = input.bool(true, "Londra Seansı Göster",   group=grp_seans)
+
+// New York: 12:00-21:00 UTC
+ny_start = input.int(12, "New York Başlangıç (UTC)",      minval=0, maxval=23, group=grp_seans)
+ny_end   = input.int(21, "New York Bitiş (UTC)",          minval=1, maxval=24, group=grp_seans)
+ny_on    = input.bool(true, "New York Seansı Göster",     group=grp_seans)
+
+grp_asian = "── Asian Range ──"
+asian_on   = input.bool(true, "Asian Range Göster (günlük referans)", group=grp_asian)
+asian_s    = input.int(0,  "Asian Range Başlangıç (UTC)", minval=0, maxval=23, group=grp_asian)
+asian_e    = input.int(8,  "Asian Range Bitiş (UTC)",     minval=1, maxval=24, group=grp_asian)
+
+grp_pivot = "── Günlük Pivot Seviyeleri ──"
+pivot_on  = input.bool(true, "Pivot Seviyeleri Göster (R1/R2/S1/S2)", group=grp_pivot)
+
+// ══════════════════════════════════════════════════════════════
+// ZAMAN HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+// UTC saatini al (Unix timestamp / 3600 mod 24)
+current_hour_utc = hour(time, "UTC")
+current_min_utc  = minute(time, "UTC")
+
+// Seans kontrolü
+in_tokyo  = current_hour_utc >= tokyo_start  and current_hour_utc < tokyo_end
+in_londra = current_hour_utc >= londra_start and current_hour_utc < londra_end
+in_ny     = current_hour_utc >= ny_start     and current_hour_utc < ny_end
+in_asian  = current_hour_utc >= asian_s      and current_hour_utc < asian_e
+
+// Overlap (yüksek volatilite bölgeleri)
+overlap_ldny = in_londra and in_ny          // 12:00-16:00 UTC — En önemli
+overlap_tkld = in_tokyo  and in_londra      // 07:00-09:00 UTC — Londra açılışı
+
+// Seans başlangıçları
+londra_open = current_hour_utc == londra_start and current_min_utc == 0
+ny_open     = current_hour_utc == ny_start     and current_min_utc == 0
+tokyo_open  = current_hour_utc == tokyo_start  and current_min_utc == 0
+
+// ══════════════════════════════════════════════════════════════
+// ASIAN RANGE
+// ══════════════════════════════════════════════════════════════
+// Asian session'da oluşan high/low günün referansıdır
+var float asian_high = na
+var float asian_low  = na
+var float asian_high_lock = na   // Asian kapandıktan sonra sabit
+var float asian_low_lock  = na
+
+if in_asian
+    if na(asian_high) or high > asian_high
+        asian_high := high
+    if na(asian_low)  or low  < asian_low
+        asian_low  := low
+
+// Asian kapandığında kilitle
+if current_hour_utc == asian_e and current_min_utc == 0
+    asian_high_lock := asian_high
+    asian_low_lock  := asian_low
+    asian_high      := na
+    asian_low       := na
+
+// ══════════════════════════════════════════════════════════════
+// GÜNLÜK PİVOT SEVİYELERİ (Dünkü High/Low/Close)
+// ══════════════════════════════════════════════════════════════
+prev_high  = request.security(syminfo.tickerid, "D", high[1],  lookahead=barmerge.lookahead_off)
+prev_low   = request.security(syminfo.tickerid, "D", low[1],   lookahead=barmerge.lookahead_off)
+prev_close = request.security(syminfo.tickerid, "D", close[1], lookahead=barmerge.lookahead_off)
+
+pivot_pp = (prev_high + prev_low + prev_close) / 3
+pivot_r1 = 2 * pivot_pp - prev_low
+pivot_r2 = pivot_pp + (prev_high - prev_low)
+pivot_s1 = 2 * pivot_pp - prev_high
+pivot_s2 = pivot_pp - (prev_high - prev_low)
+
+// ══════════════════════════════════════════════════════════════
+// SEANS ARKA PLAN RENKLERİ
+// ══════════════════════════════════════════════════════════════
+// Seans renkleri (şeffaf)
+tokyo_col  = color.new(#E3F2FD, is_dark ? 93 : 96)  // Açık mavi
+londra_col = color.new(#FFF8E1, is_dark ? 93 : 96)  // Açık sarı
+ny_col     = color.new(#FCE4EC, is_dark ? 93 : 96)  // Açık pembe
+overlap_col = color.new(#E8F5E9, is_dark ? 88 : 90) // Açık yeşil (overlap)
+
+bgcolor(tokyo_on  and in_tokyo  and not overlap_tkld ? tokyo_col  : na, title="Tokyo Seansı")
+bgcolor(londra_on and in_londra and not overlap_ldny and not overlap_tkld ? londra_col : na, title="Londra Seansı")
+bgcolor(ny_on     and in_ny     and not overlap_ldny ? ny_col     : na, title="NY Seansı")
+bgcolor(overlap_ldny ? color.new(#81C784, is_dark ? 85 : 88) : na, title="LD/NY Overlap")
+bgcolor(overlap_tkld ? color.new(#FFD54F, is_dark ? 88 : 90) : na, title="TK/LD Overlap")
+
+// ══════════════════════════════════════════════════════════════
+// SEANS AÇILIŞ ÇİZGİLERİ
+// ══════════════════════════════════════════════════════════════
+plotshape(londra_on and londra_open, "Londra Açılış", shape.triangleright, location.high, color.new(C_WARN, 0), size=size.small)
+plotshape(ny_on     and ny_open,     "NY Açılış",     shape.triangleright, location.high, color.new(C_BEAR, 0), size=size.small)
+plotshape(tokyo_on  and tokyo_open,  "Tokyo Açılış",  shape.triangleright, location.high, color.new(C_ACCENT,0), size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Asian Range
+// ══════════════════════════════════════════════════════════════
+plot(asian_on and not in_asian ? asian_high_lock : na, "Asian High", color=color.new(C_WARN, 30), linewidth=2, style=plot.style_circles)
+plot(asian_on and not in_asian ? asian_low_lock  : na, "Asian Low",  color=color.new(C_ACCENT, 30), linewidth=2, style=plot.style_circles)
+
+// Asian range kırılımı
+asian_break_up   = not in_asian and not na(asian_high_lock) and ta.crossover(close,  asian_high_lock)
+asian_break_down = not in_asian and not na(asian_low_lock)  and ta.crossunder(close, asian_low_lock)
+
+plotshape(asian_on and asian_break_up,   "Asian Break ↑", shape.arrowup,   location.top,    C_BULL, size=size.normal)
+plotshape(asian_on and asian_break_down, "Asian Break ↓", shape.arrowdown, location.bottom, C_BEAR, size=size.normal)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Pivot Seviyeleri
+// ══════════════════════════════════════════════════════════════
+pivot_pp_col = color.new(C_NEUT,  30)
+pivot_r1_col = color.new(C_BEAR,  30)
+pivot_r2_col = color.new(C_BEAR,  55)
+pivot_s1_col = color.new(C_BULL,  30)
+pivot_s2_col = color.new(C_BULL,  55)
+
+plot(pivot_on ? pivot_pp : na, "Pivot (PP)", color=pivot_pp_col, linewidth=2, style=plot.style_circles)
+plot(pivot_on ? pivot_r1 : na, "R1",         color=pivot_r1_col, linewidth=1, style=plot.style_circles)
+plot(pivot_on ? pivot_r2 : na, "R2",         color=pivot_r2_col, linewidth=1, style=plot.style_circles)
+plot(pivot_on ? pivot_s1 : na, "S1",         color=pivot_s1_col, linewidth=1, style=plot.style_circles)
+plot(pivot_on ? pivot_s2 : na, "S2",         color=pivot_s2_col, linewidth=1, style=plot.style_circles)
+
+// ══════════════════════════════════════════════════════════════
+// SEANS ETİKETİ
+// ══════════════════════════════════════════════════════════════
+if barstate.islast and timeframe.isintraday
+    aktif_seans = overlap_ldny ? "LD/NY OVERLAP 🔥" :
+                  overlap_tkld ? "TK/LD OVERLAP 🔶" :
+                  in_londra    ? "Londra 🟡" :
+                  in_ny        ? "New York 🔴" :
+                  in_tokyo     ? "Tokyo 🔵" :
+                  "Kapalı Dönem 💤"
+
+    pip_digits = syminfo.mintick < 0.01 ? 5 : 3  // Pip hassasiyeti
+    asian_range_pips = not na(asian_high_lock) and not na(asian_low_lock) ?
+                       str.tostring((asian_high_lock - asian_low_lock) / syminfo.mintick / 10, "#") + " pip" : "—"
+
+    label.new(bar_index + 2, close,
+              "Aktif Seans: " + aktif_seans + "\n" +
+              "PP: " + str.tostring(pivot_pp,"#.#####") + "\n" +
+              "Asian Aralık: " + asian_range_pips,
+              color=color.new(C_ACCENT, 80),
+              textcolor=C_ACCENT,
+              style=label.style_label_left,
+              size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(londra_open,     "Londra Açılışı",    "🟡 Londra Seansı Açıldı | {{ticker}}")
+alertcondition(ny_open,         "NY Açılışı",        "🔴 New York Seansı Açıldı | {{ticker}}")
+alertcondition(overlap_ldny and not overlap_ldny[1], "LD/NY Overlap", "🔥 LD/NY Overlap Başladı! | {{ticker}}")
+alertcondition(asian_break_up,  "Asian Break Yukarı","🟢 Asian Range Yukarı Kırıldı | {{ticker}} @ {{close}}")
+alertcondition(asian_break_down,"Asian Break Aşağı", "🔴 Asian Range Aşağı Kırıldı | {{ticker}} @ {{close}}")
+
+// Pivot yakınlığı alertleri
+near_r1 = math.abs(close - pivot_r1) / pivot_r1 < 0.001
+near_s1 = math.abs(close - pivot_s1) / pivot_s1 < 0.001
+alertcondition(pivot_on and near_r1, "R1 Yakın", "⚠️ Fiyat R1'e Yakın | {{ticker}} @ {{close}}")
+alertcondition(pivot_on and near_s1, "S1 Yakın", "⚠️ Fiyat S1'e Yakın | {{ticker}} @ {{close}}")
+
+if barstate.isconfirmed
+    if asian_break_up
+        alert('{"event":"ASIAN_BREAK_UP","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"asian_high":' + str.tostring(asian_high_lock) + '}', alert.freq_once_per_bar_close)
+    if asian_break_down
+        alert('{"event":"ASIAN_BREAK_DOWN","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"asian_low":' + str.tostring(asian_low_lock) + '}', alert.freq_once_per_bar_close)

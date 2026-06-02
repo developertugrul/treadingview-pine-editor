@@ -1,0 +1,168 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         EMTİA SİNYAL PAKETİ — v6                            ║
+// ║  Mum Formasyonları · Konfluens · DXY Ağırlıklı Skor         ║
+// ║  Altın · Gümüş · Petrol · Bakır · Tarım Emtiaları           ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Emtia Sinyal Paketi", overlay=true, max_bars_back=500, max_labels_count=200)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#FFD700, 0) : color.new(#B8860B, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_WARN   = is_dark ? color.new(#FF9800, 0) : color.new(#E65100, 0)
+C_ACCENT = is_dark ? color.new(#81C784, 0) : color.new(#2E7D32, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+mum_on      = input.bool(true, "Mum Formasyonları")
+kf_min_al   = input.int(5, "AL Min Skor", minval=1, maxval=10)
+kf_min_sat  = input.int(5, "SAT Min Skor",minval=1, maxval=10)
+al_min_skor = input.int(6, "Alert Min Skor",minval=1,maxval=10)
+webhook_on  = input.bool(true, "Webhook JSON")
+mtf_tf      = input.timeframe("W", "MTF TF (Emtia: Haftalık)")
+dxy_symbol  = input.symbol("DXY", "DXY Sembolü")
+
+// ══════════════════════════════════════════════════════════════
+// MUM FORMASYONLARI
+// ══════════════════════════════════════════════════════════════
+body = math.abs(close-open); range_ = high-low
+wick_up = high-math.max(close,open); wick_dn = math.min(close,open)-low
+is_bull_bar = close>open; is_bear_bar = close<open
+
+hammer       = is_bull_bar and wick_dn>body*2 and wick_up<body*0.5
+hanging_man  = is_bear_bar and wick_dn>body*2 and wick_up<body*0.5
+bull_engulf  = is_bear_bar[1] and is_bull_bar and close>open[1] and open<close[1]
+bear_engulf  = is_bull_bar[1] and is_bear_bar and close<open[1] and open>close[1]
+doji         = body<range_*0.1 and range_>0
+pin_bar_bull = wick_dn>body*2.5 and wick_up<wick_dn*0.3
+pin_bar_bear = wick_up>body*2.5 and wick_dn<wick_up*0.3
+morning_star = is_bear_bar[2] and body[2]>range_[2]*0.4 and body[1]<range_[1]*0.3 and is_bull_bar and close>(open[2]+close[2])/2
+evening_star = is_bull_bar[2] and body[2]>range_[2]*0.4 and body[1]<range_[1]*0.3 and is_bear_bar and close<(open[2]+close[2])/2
+
+bull_pattern = hammer or bull_engulf or pin_bar_bull or morning_star
+bear_pattern = hanging_man or bear_engulf or pin_bar_bear or evening_star
+pattern_name = bull_engulf?"Bull Eng":bear_engulf?"Bear Eng":hammer?"Hammer":hanging_man?"Hanging Man":morning_star?"Morning Star":evening_star?"Evening Star":pin_bar_bull?"Bull Pin":pin_bar_bear?"Bear Pin":doji?"Doji":"—"
+
+// ══════════════════════════════════════════════════════════════
+// İNDİKATÖRLER
+// ══════════════════════════════════════════════════════════════
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+[st_v, st_d] = ta.supertrend(3.0, 14)
+rsi_v  = ta.rsi(close, 14)
+[_,_,macd_h] = ta.macd(close, 12, 26, 9)
+vol_avg = ta.sma(volume, 20)
+rel_vol = vol_avg > 0 ? volume/vol_avg : 1.0
+atr_v   = ta.atr(14)
+
+// 52 haftalık seviyeler
+y_high = ta.highest(high, math.min(bar_index+1, 260))
+y_low  = ta.lowest(low,   math.min(bar_index+1, 260))
+near_y_high = math.abs(close-y_high) < atr_v*1.5
+near_y_low  = math.abs(close-y_low)  < atr_v*1.5
+
+// DXY yönü (ters korelasyon için)
+dxy_close = request.security(dxy_symbol, timeframe.period, close, lookahead=barmerge.lookahead_off)
+dxy_yukari = dxy_close > ta.ema(dxy_close, 20)
+
+// MTF
+[mtf_e50, mtf_e200] = request.security(syminfo.tickerid, mtf_tf, [ta.ema(close,50),ta.ema(close,200)], lookahead=barmerge.lookahead_off)
+mtf_yukari = mtf_e50 > mtf_e200
+
+// Pivot
+ph_lb = 14
+ph = ta.pivothigh(high, ph_lb, ph_lb)
+pl = ta.pivotlow(low, ph_lb, ph_lb)
+var float last_res = na, var float last_sup = na
+if not na(ph) : last_res := ph
+if not na(pl) : last_sup := pl
+near_sup = not na(last_sup) and math.abs(close-last_sup) < atr_v*0.8
+near_res = not na(last_res) and math.abs(close-last_res) < atr_v*0.8
+
+// Squeeze
+sq_bitti = not (ta.sma(close,20)+2.0*ta.stdev(close,20) < ta.ema(close,20)+1.5*ta.atr(20)) and
+           (ta.sma(close,20)[1]+2.0*ta.stdev(close,20)[1] < ta.ema(close,20)[1]+1.5*ta.atr(20)[1])
+
+// ══════════════════════════════════════════════════════════════
+// KONFLUENS SKORU — EMTİA AĞIRLIKLARI
+// ══════════════════════════════════════════════════════════════
+al_skor  = 0
+al_skor += close > ema200  ? 1 : 0    // 1. Uzun vade trend
+al_skor += close > ema50   ? 1 : 0    // 2. Orta vade trend
+al_skor += st_d < 0        ? 1 : 0    // 3. SuperTrend
+al_skor += rsi_v > 45 and rsi_v < 70 ? 1 : 0  // 4. RSI
+al_skor += macd_h > 0      ? 1 : 0    // 5. MACD
+al_skor += not dxy_yukari  ? 1 : 0    // 6. DXY zayıflıyor (emtia için pozitif, ters kor.)
+al_skor += sq_bitti        ? 1 : 0    // 7. Squeeze
+al_skor += bull_pattern    ? 1 : 0    // 8. Boğa mum
+al_skor += mtf_yukari      ? 1 : 0    // 9. MTF haftalık trend
+al_skor += near_y_low or near_sup ? 1 : 0  // 10. 52H dip veya destek
+
+sat_skor  = 0
+sat_skor += close < ema200 ? 1 : 0
+sat_skor += close < ema50  ? 1 : 0
+sat_skor += st_d > 0       ? 1 : 0
+sat_skor += rsi_v > 65     ? 1 : 0
+sat_skor += macd_h < 0     ? 1 : 0
+sat_skor += dxy_yukari     ? 1 : 0    // DXY güçleniyor (emtia için negatif)
+sat_skor += sq_bitti       ? 1 : 0
+sat_skor += bear_pattern   ? 1 : 0
+sat_skor += not mtf_yukari ? 1 : 0
+sat_skor += near_y_high or near_res ? 1 : 0  // 52H zirve veya direnç
+
+al_sinyali  = al_skor  >= kf_min_al  and barstate.isconfirmed
+sat_sinyali = sat_skor >= kf_min_sat and barstate.isconfirmed
+al_guclu    = al_skor  >= 8 and barstate.isconfirmed
+sat_guclu   = sat_skor >= 8 and barstate.isconfirmed
+
+// ══════════════════════════════════════════════════════════════
+// PLOT
+// ══════════════════════════════════════════════════════════════
+plotshape(mum_on and hammer,      "Hammer",   shape.labelup,   location.belowbar, C_BULL, text="H",  size=size.tiny)
+plotshape(mum_on and bull_engulf, "Bull Eng", shape.labelup,   location.belowbar, C_BULL, text="E",  size=size.tiny)
+plotshape(mum_on and pin_bar_bull,"Bull Pin", shape.labelup,   location.belowbar, C_BULL, text="P",  size=size.tiny)
+plotshape(mum_on and morning_star,"Morn.Star",shape.labelup,   location.belowbar, C_BULL, text="MS", size=size.tiny)
+plotshape(mum_on and hanging_man, "Hang.Man", shape.labeldown, location.abovebar, C_BEAR, text="HM", size=size.tiny)
+plotshape(mum_on and bear_engulf, "Bear Eng", shape.labeldown, location.abovebar, C_BEAR, text="E",  size=size.tiny)
+plotshape(mum_on and pin_bar_bear,"Bear Pin", shape.labeldown, location.abovebar, C_BEAR, text="P",  size=size.tiny)
+plotshape(mum_on and evening_star,"Even.Star",shape.labeldown, location.abovebar, C_BEAR, text="ES", size=size.tiny)
+
+plotshape(al_sinyali  and not al_guclu,  "AL",     shape.triangleup,   location.belowbar, color.new(C_BULL,20), size=size.small)
+plotshape(sat_sinyali and not sat_guclu, "SAT",    shape.triangledown, location.abovebar, color.new(C_BEAR,20), size=size.small)
+plotshape(al_guclu,  "GÜÇLÜ AL",  shape.triangleup,   location.belowbar, C_ACCENT, size=size.large)
+plotshape(sat_guclu, "GÜÇLÜ SAT", shape.triangledown, location.abovebar, C_BEAR,   size=size.large)
+
+if barstate.isconfirmed and (al_sinyali or sat_sinyali)
+    sd = al_sinyali ? al_skor : sat_skor
+    sy = al_sinyali ? "AL" : "SAT"
+    sc = al_sinyali ? C_ACCENT : C_BEAR
+    sp = al_sinyali ? low-atr_v*0.3 : high+atr_v*0.3
+    ss = al_sinyali ? label.style_label_up : label.style_label_down
+    dxy_not = dxy_yukari ? " [DXY↑⚠]" : " [DXY↓✓]"
+    label.new(bar_index, sp, sy + " " + str.tostring(sd) + "/10\n" + pattern_name + dxy_not,
+              color=color.new(sc,70), textcolor=sc, style=ss, size=size.small)
+
+alertcondition(al_sinyali,  "Emtia AL",   "🟡 EMTİA AL | {{ticker}} | Skor: " + str.tostring(al_skor) + "/10 @ {{close}}")
+alertcondition(sat_sinyali, "Emtia SAT",  "🔴 EMTİA SAT | {{ticker}} | Skor: " + str.tostring(sat_skor) + "/10 @ {{close}}")
+alertcondition(al_guclu,    "Güçlü AL",   "🚀 EMTİA GÜÇLÜ AL (8+) | {{ticker}} @ {{close}}")
+
+if barstate.isconfirmed
+    if al_skor >= al_min_skor
+        dxy_dir = dxy_yukari ? "yukari" : "asagi"
+        if webhook_on
+            alert('{"event":"EMTIA_AL","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"skor":' + str.tostring(al_skor) + ',"formasyon":"' + pattern_name + '","dxy_yon":"' + dxy_dir + '","tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+        else
+            alert("🟡 EMTİA AL: " + syminfo.ticker + " | " + str.tostring(close,"#.##") + " | " + pattern_name, alert.freq_once_per_bar_close)
+    if sat_skor >= al_min_skor
+        dxy_dir = dxy_yukari ? "yukari" : "asagi"
+        if webhook_on
+            alert('{"event":"EMTIA_SAT","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"skor":' + str.tostring(sat_skor) + ',"formasyon":"' + pattern_name + '","dxy_yon":"' + dxy_dir + '","tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+        else
+            alert("🔴 EMTİA SAT: " + syminfo.ticker + " | " + str.tostring(close,"#.##") + " | " + pattern_name, alert.freq_once_per_bar_close)

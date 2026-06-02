@@ -1,0 +1,182 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         EMTİA KORELASYON PAKETİ — v6                        ║
+// ║  DXY Korelasyonu · Altın/Gümüş Oranı · Emtia/MA Oranı       ║
+// ║  Mevsimsel Referans · Spread Analizi                         ║
+// ║  Yalnızca EMTİA (XAUUSD, XAGUSD, CL, NG, HG vb.) için      ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Emtia Korelasyon Paketi", overlay=false, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#FFD700, 0) : color.new(#B8860B, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#81C784, 0) : color.new(#2E7D32, 0)
+C_WARN   = is_dark ? color.new(#FF9800, 0) : color.new(#E65100, 0)
+C_SILVER = is_dark ? color.new(#B0BEC5, 0) : color.new(#607D8B, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_dxy = "── DXY Korelasyonu ──"
+dxy_on     = input.bool(true,  "DXY Korelasyonu Göster", group=grp_dxy)
+dxy_per    = input.int(20,     "Korelasyon Periyotu",  minval=5, maxval=100, group=grp_dxy)
+// DXY sembolü: TradingView'da "DXY" veya "USDOLLAR"
+dxy_symbol = input.symbol("DXY", "DXY Sembolü (TradingView'da arama yapın)", group=grp_dxy)
+
+grp_ratio = "── Altın/Gümüş Oranı ──"
+ratio_on = input.bool(true, "Altın/Gümüş Oranı (Sadece XAU veya XAG için)", group=grp_ratio)
+
+grp_ma = "── Fiyat/MA Oranı ──"
+ma_on  = input.bool(true, "Fiyat/MA Oranı Göster", group=grp_ma)
+ma_per = input.int(50,    "MA Periyotu", minval=10, group=grp_ma)
+
+grp_seasonal = "── Mevsimsel Referans ──"
+seasonal_on = input.bool(true, "Ay Notları Göster (Referans)", group=grp_seasonal)
+
+// ══════════════════════════════════════════════════════════════
+// DXY VERİLERİ
+// ══════════════════════════════════════════════════════════════
+dxy_close = request.security(dxy_symbol, timeframe.period, close, lookahead=barmerge.lookahead_off)
+
+// Korelasyon hesabı (Pearson korelasyon katsayısı)
+x = close
+y = dxy_close
+
+x_avg = ta.sma(x, dxy_per)
+y_avg = ta.sma(y, dxy_per)
+
+cov_xy = ta.sma((x - x_avg) * (y - y_avg), dxy_per)
+std_x  = ta.stdev(x, dxy_per)
+std_y  = ta.stdev(y, dxy_per)
+
+corr = std_x * std_y > 0 ? cov_xy / (std_x * std_y) : 0.0
+
+// Korelasyon normalize (-1 ile 1 arası → 0-100 arası)
+corr_norm = (corr + 1) * 50   // -1→0, 0→50, +1→100
+
+// ══════════════════════════════════════════════════════════════
+// ALTIN/GÜMÜŞ ORANI
+// ══════════════════════════════════════════════════════════════
+gold_close   = request.security("XAUUSD", timeframe.period, close, lookahead=barmerge.lookahead_off)
+silver_close = request.security("XAGUSD", timeframe.period, close, lookahead=barmerge.lookahead_off)
+
+gold_silver_ratio = silver_close > 0 ? gold_close / silver_close : na
+gsr_avg   = ta.sma(gold_silver_ratio, 50)
+gsr_high  = ta.highest(gold_silver_ratio, 200)
+gsr_low   = ta.lowest(gold_silver_ratio,  200)
+
+// GSR normalizasyonu (tarihi range içinde 0-100)
+gsr_norm = gsr_high - gsr_low > 0 ? (gold_silver_ratio - gsr_low) / (gsr_high - gsr_low) * 100 : 50.0
+
+// GSR yorumu: Yüksek GSR = Gümüş ucuz, Düşük GSR = Gümüş pahalı
+gsr_extreme_high = gold_silver_ratio > 85   // Tarihsel: 80+ = gümüş çok ucuz
+gsr_extreme_low  = gold_silver_ratio < 65   // Tarihsel: 65- = altın ucuz
+
+// ══════════════════════════════════════════════════════════════
+// FİYAT/MA ORANI
+// ══════════════════════════════════════════════════════════════
+ma_val  = ta.sma(close, ma_per)
+ma_ratio = ma_val > 0 ? (close / ma_val - 1) * 100 : 0.0  // MA'ya göre % fark
+ma_ratio_norm = math.max(0.0, math.min(100.0, 50.0 + ma_ratio * 2.0))  // 0-100
+
+// ══════════════════════════════════════════════════════════════
+// DXY YÖN TESPİTİ
+// ══════════════════════════════════════════════════════════════
+dxy_yukari = dxy_close > dxy_close[5]
+dxy_emtia_pozitif = corr > 0.3    // Pozitif korelasyon (USDTRY gibi)
+dxy_emtia_negatif = corr < -0.3   // Negatif korelasyon (XAUUSD, CL gibi)
+
+// DXY yukarıyken negatif korelasyonlu emtia satış baskısı altında
+dxy_risk = dxy_emtia_negatif and dxy_yukari
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Korelasyon
+// ══════════════════════════════════════════════════════════════
+corr_col = corr > 0.3 ? C_BULL : corr < -0.3 ? C_BEAR : C_NEUT
+plot(dxy_on ? corr_norm : na, "DXY Korelasyon Normalize",
+     color=corr_col, linewidth=2, style=plot.style_line)
+
+// Korelasyon referans çizgileri
+plot(dxy_on ? 65.0 : na, "Pozitif Korelasyon (+0.3)", color=color.new(C_BULL,70), linewidth=1, style=plot.style_dashed)
+plot(dxy_on ? 50.0 : na, "Nötr",                      color=color.new(C_NEUT,70), linewidth=1, style=plot.style_dashed)
+plot(dxy_on ? 35.0 : na, "Negatif Korelasyon (-0.3)", color=color.new(C_BEAR,70), linewidth=1, style=plot.style_dashed)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Altın/Gümüş Oranı
+// ══════════════════════════════════════════════════════════════
+gsr_col = gsr_extreme_high ? C_ACCENT : gsr_extreme_low ? C_BEAR : C_SILVER
+plot(ratio_on ? gsr_norm : na, "GSR Normalize",
+     color=gsr_col, linewidth=2, style=plot.style_stepline)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Fiyat/MA Oranı
+// ══════════════════════════════════════════════════════════════
+ma_col = ma_ratio > 5 ? C_BEAR : ma_ratio < -5 ? C_ACCENT : C_NEUT
+plot(ma_on ? ma_ratio_norm : na, "Fiyat/MA" + str.tostring(ma_per) + " Oranı",
+     color=ma_col, linewidth=1, style=plot.style_stepline)
+
+// ══════════════════════════════════════════════════════════════
+// MEVSIMSEL REFERANS ETİKETLERİ
+// ══════════════════════════════════════════════════════════════
+// Ay başında küçük referans notu
+ay = month(time)
+ay_sonu   = month(time[1]) != ay
+ay_notlar = ay == 1  ? "OCA\nAltın:Güçlü,Petrol:Yükseliş başlar" :
+            ay == 2  ? "ŞUB\nAltın:Nötr,Gümüş:Zayıf" :
+            ay == 3  ? "MAR\nTarım:Ekim dönemi" :
+            ay == 4  ? "NİS\nPetrol:Talep artar" :
+            ay == 5  ? "MAY\nAltın:Yaz zayıflığı başlayabilir" :
+            ay == 6  ? "HAZ\nPetrol:Sürüş sezonu zirve" :
+            ay == 7  ? "TEM\nAltın:Sezonsal dip bölgesi" :
+            ay == 8  ? "AĞU\nAltın:Alım fırsatı izle" :
+            ay == 9  ? "EYL\nAltın:Sezonsal güçlenme başlar" :
+            ay == 10 ? "EKİ\nTarım hasat, petrol talep azalır" :
+            ay == 11 ? "KAS\nAltın:Güçlü dönem" :
+            "ARA\nAltın:Zayıf olabilir (tatil dönemi)"
+
+if barstate.isconfirmed and seasonal_on and ay_sonu
+    label.new(bar_index, 50,  // Panel ortasında
+              ay_notlar,
+              color=color.new(C_WARN, 70),
+              textcolor=C_WARN,
+              style=label.style_label_right,
+              size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// DXY RİSK ARKA PLAN
+// ══════════════════════════════════════════════════════════════
+bgcolor(dxy_on and dxy_risk ? color.new(C_BEAR, 93) : na, title="DXY Risk Arka Plan")
+
+// ══════════════════════════════════════════════════════════════
+// ETİKET
+// ══════════════════════════════════════════════════════════════
+if barstate.islast
+    corr_txt = corr > 0.5 ? "GÜÇLÜ POZ" : corr > 0.3 ? "Pozitif" : corr < -0.5 ? "GÜÇLÜ NEG" : corr < -0.3 ? "Negatif" : "Nötr"
+    gsr_txt  = gsr_extreme_high ? "Gümüş UCUZ (>85)" : gsr_extreme_low ? "Altın Ucuz (<65)" : str.tostring(gold_silver_ratio,"#.#")
+
+    label.new(bar_index+2, corr_norm,
+              "DXY Korelasyon: " + corr_txt + " (" + str.tostring(corr,"#.##") + ")\n" +
+              "DXY Yönü: " + (dxy_yukari ? "↑ Güçleniyor" : "↓ Zayıflıyor") + "\n" +
+              "GSR (Altın/Gümüş): " + gsr_txt + "\n" +
+              "Fiyat/" + str.tostring(ma_per) + "MA: " + str.tostring(ma_ratio,"#.##") + "%",
+              color=color.new(corr_col, 80), textcolor=corr_col,
+              style=label.style_label_left, size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+corr_degisti_pozitif = ta.crossover(corr,  0.3)   // Negatiften pozitife
+corr_degisti_negatif = ta.crossunder(corr, -0.3)  // Pozitiften negatife
+
+alertcondition(dxy_risk,             "DXY Risk",           "⚠️ DXY Güçleniyor (Emtia Baskı Altında) | {{ticker}}")
+alertcondition(gsr_extreme_high,     "GSR Yüksek (>85)",   "⚠️ Altın/Gümüş Oranı Çok Yüksek — Gümüş Tarihsel Ucuz")
+alertcondition(corr_degisti_negatif, "Korelasyon Döndü",   "🔄 DXY Korelasyonu Negatife Döndü | {{ticker}}")
+
+if barstate.isconfirmed and dxy_risk
+    alert('{"event":"DXY_RISK","ticker":"' + syminfo.ticker + '","corr":' + str.tostring(corr,"#.##") + ',"dxy_yukari":true}', alert.freq_once_per_bar_close)

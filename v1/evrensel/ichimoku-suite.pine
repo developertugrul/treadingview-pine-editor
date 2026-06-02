@@ -1,0 +1,187 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         ICHİMOKU BULUTU — v6                                ║
+// ║  Tenkan · Kijun · Kumo (Bulut) · Chikou · TK Cross          ║
+// ║  ► TÜM VARLIK SINIFLARI İÇİN (EVRENSEL)                     ║
+// ║  ► Trend + Destek/Direnç + Momentum hepsi bir arada          ║
+// ╚══════════════════════════════════════════════════════════════╝
+// NASIL OKUNUR:
+// 1. Fiyat bulutun üstünde → YUKARI TREND
+// 2. Fiyat bulutun altında → AŞAĞI TREND
+// 3. Fiyat bulut içinde    → KARARSIZ
+// 4. Tenkan > Kijun → Kısa vade yükseliş
+// 5. Chikou fiyatın üstünde → Onay sinyali
+// 6. Bulutun alt = Destek (yeşil bulut), üst = Direnç (kırmızı bulut)
+indicator("Ichimoku Bulutu", overlay=true, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_ichi = "── Ichimoku Parametreleri ──"
+tenkan_per  = input.int(9,   "Tenkan-sen (Dönüşüm Çizgisi)",  minval=1, group=grp_ichi)
+kijun_per   = input.int(26,  "Kijun-sen (Baz Çizgisi)",       minval=1, group=grp_ichi)
+senkou_b_per = input.int(52, "Senkou Span B (Uzun Dönem)",     minval=1, group=grp_ichi)
+chikou_on   = input.bool(true, "Chikou Span Göster",          group=grp_ichi)
+cloud_on    = input.bool(true, "Bulut (Kumo) Göster",         group=grp_ichi)
+signal_on   = input.bool(true, "TK Cross Sinyalleri",         group=grp_ichi)
+kijun_cross = input.bool(true, "Kijun Cross Sinyalleri",      group=grp_ichi)
+
+grp_renk = "── Renkler ──"
+tenkan_col = input.color(color.new(#F44336, 0), "Tenkan-sen Rengi",     group=grp_renk)
+kijun_col  = input.color(color.new(#2196F3, 0), "Kijun-sen Rengi",      group=grp_renk)
+chikou_col = input.color(color.new(#9C27B0, 0), "Chikou Span Rengi",    group=grp_renk)
+
+// ══════════════════════════════════════════════════════════════
+// ICHIMOKU HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+// Tenkan-sen: (Periyottaki Yüksek + Düşük) / 2
+tenkan = (ta.highest(high, tenkan_per) + ta.lowest(low, tenkan_per)) / 2
+
+// Kijun-sen: (Periyottaki Yüksek + Düşük) / 2
+kijun  = (ta.highest(high, kijun_per) + ta.lowest(low, kijun_per)) / 2
+
+// Senkou Span A: (Tenkan + Kijun) / 2 — kijun_per kadar ileri ötelenmiş
+senkou_a = (tenkan + kijun) / 2
+
+// Senkou Span B: (En yüksek + En düşük) / 2 — senkou_b_per, kijun_per kadar ileriye
+senkou_b = (ta.highest(high, senkou_b_per) + ta.lowest(low, senkou_b_per)) / 2
+
+// Chikou Span: Kapanış fiyatı kijun_per kadar geriye çekilmiş
+chikou = close
+
+// ══════════════════════════════════════════════════════════════
+// SİNYAL HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+// TK Cross (Tenkan/Kijun Kesişimi) — En önemli Ichimoku sinyali
+tk_cross_up   = ta.crossover(tenkan,  kijun)   // Bullish TK Cross
+tk_cross_down = ta.crossunder(tenkan, kijun)   // Bearish TK Cross
+
+// Kijun Cross — Fiyat Kijun'u keser
+kijun_cross_up   = ta.crossover(close,  kijun)
+kijun_cross_down = ta.crossunder(close, kijun)
+
+// Bulut durumu (geçmiş kijun_per barda)
+cloud_green = senkou_a[kijun_per] > senkou_b[kijun_per]  // Yeşil bulut = bullish
+cloud_red   = senkou_a[kijun_per] < senkou_b[kijun_per]  // Kırmızı bulut = bearish
+
+// Fiyatın buluta göre pozisyonu
+above_cloud = close > math.max(senkou_a[kijun_per], senkou_b[kijun_per])
+below_cloud = close < math.min(senkou_a[kijun_per], senkou_b[kijun_per])
+in_cloud    = not above_cloud and not below_cloud
+
+// Chikou pozisyonu (chikou vs kijun_per önceki fiyat)
+chikou_above = close > close[kijun_per]  // Chikou fiyatın üstünde = bullish
+
+// ══════════════════════════════════════════════════════════════
+// GÜÇLÜ SİNYAL — Tüm koşullar bir arada
+// ══════════════════════════════════════════════════════════════
+// İdeal bullish: Fiyat bulut üstünde + TK bullish cross + yeşil bulut + Chikou üstte
+ideal_bull = above_cloud and tk_cross_up and cloud_green and chikou_above
+ideal_bear = below_cloud and tk_cross_down and not cloud_green and not chikou_above
+
+// Zayıf sinyal — Sadece TK cross, diğerleri isteğe bağlı
+weak_bull = tk_cross_up and not below_cloud
+weak_bear = tk_cross_down and not above_cloud
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Tenkan ve Kijun
+// ══════════════════════════════════════════════════════════════
+plot(tenkan, "Tenkan-sen",  color=tenkan_col, linewidth=1)
+plot(kijun,  "Kijun-sen",   color=kijun_col,  linewidth=2)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Bulut (Senkou Span A ve B)
+// ══════════════════════════════════════════════════════════════
+sa_plot = plot(cloud_on ? senkou_a : na, "Senkou A",
+               color=color.new(C_BULL, 0), linewidth=1,
+               offset=kijun_per)
+sb_plot = plot(cloud_on ? senkou_b : na, "Senkou B",
+               color=color.new(C_BEAR, 0), linewidth=1,
+               offset=kijun_per)
+
+// Bulut dolgusu: Yeşil (bullish) veya kırmızı (bearish)
+fill(sa_plot, sb_plot,
+     color=cloud_on ? (senkou_a > senkou_b ? color.new(C_BULL, 85) : color.new(C_BEAR, 85)) : na,
+     title="Kumo (Bulut)")
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Chikou Span
+// ══════════════════════════════════════════════════════════════
+plot(chikou_on ? chikou : na, "Chikou Span",
+     color=color.new(chikou_col, 30), linewidth=1,
+     offset=-kijun_per)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — TK Cross Sinyalleri
+// ══════════════════════════════════════════════════════════════
+plotshape(signal_on and ideal_bull, "İdeal Bull TK",
+          shape.triangleup, location.belowbar, C_BULL, size=size.normal)
+plotshape(signal_on and ideal_bear, "İdeal Bear TK",
+          shape.triangledown, location.abovebar, C_BEAR, size=size.normal)
+plotshape(signal_on and weak_bull and not ideal_bull, "Zayıf Bull TK",
+          shape.triangleup, location.belowbar, color.new(C_BULL, 40), size=size.small)
+plotshape(signal_on and weak_bear and not ideal_bear, "Zayıf Bear TK",
+          shape.triangledown, location.abovebar, color.new(C_BEAR, 40), size=size.small)
+
+plotshape(kijun_cross and kijun_cross_up,   "Kijun Cross ↑",
+          shape.circle, location.belowbar, color.new(C_ACCENT, 0), size=size.tiny)
+plotshape(kijun_cross and kijun_cross_down, "Kijun Cross ↓",
+          shape.circle, location.abovebar, color.new(C_WARN, 0),   size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// BULUT SINIRI YAKINI — S/R Uyarısı
+// ══════════════════════════════════════════════════════════════
+kumo_top    = math.max(senkou_a[kijun_per], senkou_b[kijun_per])
+kumo_bottom = math.min(senkou_a[kijun_per], senkou_b[kijun_per])
+atr_v       = ta.atr(14)
+near_kumo_top    = math.abs(close - kumo_top)    < atr_v * 0.5 and above_cloud
+near_kumo_bottom = math.abs(close - kumo_bottom) < atr_v * 0.5 and below_cloud
+
+// ══════════════════════════════════════════════════════════════
+// ETİKET
+// ══════════════════════════════════════════════════════════════
+if barstate.islast
+    konum = above_cloud ? "BULUT ÜSTÜNDE ▲" : below_cloud ? "BULUT ALTINDA ▼" : "BULUT İÇİNDE ~"
+    konum_col = above_cloud ? C_BULL : below_cloud ? C_BEAR : C_WARN
+
+    tk_yonu = tenkan > kijun ? "Tenkan>Kijun (↑)" : "Tenkan<Kijun (↓)"
+    chikou_d = chikou_above ? "Chikou Üstte ✓" : "Chikou Altında ✗"
+    cloud_d  = cloud_green ? "Yeşil Bulut ✓" : "Kırmızı Bulut ✗"
+
+    label.new(bar_index + 2, high,
+              konum + "\n" +
+              tk_yonu + "\n" +
+              chikou_d + "\n" +
+              cloud_d,
+              color=color.new(konum_col, 80),
+              textcolor=konum_col,
+              style=label.style_label_left,
+              size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(ideal_bull,       "İdeal Bullish Ichimoku", "🌟 İdeal Bullish TK Cross (tüm koşullar) | {{ticker}} @ {{close}}")
+alertcondition(ideal_bear,       "İdeal Bearish Ichimoku", "🌟 İdeal Bearish TK Cross (tüm koşullar) | {{ticker}} @ {{close}}")
+alertcondition(tk_cross_up,      "TK Cross Yukari",        "🟢 TK Bullish Cross | {{ticker}} @ {{close}}")
+alertcondition(tk_cross_down,    "TK Cross Asagi",         "🔴 TK Bearish Cross | {{ticker}} @ {{close}}")
+alertcondition(kijun_cross_up,   "Kijun Cross Yukari",     "🟢 Fiyat Kijun'u Yukarı Kesti | {{ticker}}")
+alertcondition(kijun_cross_down, "Kijun Cross Asagi",      "🔴 Fiyat Kijun'u Aşağı Kesti | {{ticker}}")
+
+if barstate.isconfirmed
+    if ideal_bull
+        alert('{"event":"ICHIMOKU_IDEAL_BULL","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+    if ideal_bear
+        alert('{"event":"ICHIMOKU_IDEAL_BEAR","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)

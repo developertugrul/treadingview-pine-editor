@@ -1,0 +1,23 @@
+// © BorsaHocam
+
+study(title="S T R", overlay=true)
+
+ema5 = ema(close,5)
+ema21 = ema(close, 21)
+ema100 = ema(close, 100)
+ema200 = ema(close,200)
+
+plot(ema5, title = "ema5", color = lime, linewidth = 2)
+plot(ema21, title = "ema21", color = teal, linewidth = 3)
+plot(ema100, title = "ema100", color = white, linewidth = 4)
+plot(ema200, title = "ema200", color = red, linewidth = 5)
+
+
+
+plot(cross(ema5, ema21) and ema5[1] < ema21[1] ? ema5: na, title="Buy", style=cross, linewidth=4, color=white)
+plot(cross(ema5, ema21) and ema5[1] > ema21[1] ? ema5 : na, title="Sell", style=cross, linewidth=4, color=black)
+
+plotshape(cross(ema5, ema21) and ema5[1] < ema21[1] ? true : na, style=shape.triangleup, text="Buy",color=white,size=size.small, location=location.belowbar,transp=0)
+plotshape(cross(ema5, ema21) and ema5[1] > ema21[1] ? true : na, style=shape.triangledown, text="Sell",color=white,size=size.small, location=location.abovebar,transp=0)
+
+barcolor(cross(ema5, ema21) and ema5[1] < ema21[1] ? blue: cross(ema5, ema21) and ema5[1] > ema21[1] ? white: close < open ? red: green)

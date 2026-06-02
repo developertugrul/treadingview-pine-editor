@@ -1,0 +1,230 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║           HİSSE TREND PAKETİ — v6                            ║
+// ║  EMA 8/21/50/200 · SuperTrend · Dinamik S/R · VWAP · MTF    ║
+// ║  Birlikte Çalışır: momentum-suite · volatilite-suite         ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Hisse Trend Paketi", overlay=true, max_bars_back=500, max_lines_count=100, max_labels_count=50)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE DETECTION
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_ema = "── Hareketli Ortalamalar ──"
+ema8_on   = input.bool(true,  "EMA 8 Göster",   group=grp_ema)
+ema21_on  = input.bool(true,  "EMA 21 Göster",  group=grp_ema)
+ema50_on  = input.bool(true,  "EMA 50 Göster",  group=grp_ema)
+ema200_on = input.bool(true,  "EMA 200 Göster", group=grp_ema)
+ema_fill  = input.bool(true,  "EMA 8/21 Fill",  group=grp_ema)
+bar_renk  = input.bool(true,  "Bar Renklendirme", group=grp_ema)
+
+grp_st = "── SuperTrend ──"
+st_on   = input.bool(true,   "SuperTrend Göster", group=grp_st)
+st_per  = input.int(10,      "Periyot",  minval=3, maxval=50,  group=grp_st)
+st_mult = input.float(3.0,   "Çarpan",  minval=0.5, maxval=10, step=0.1, group=grp_st)
+
+grp_sr = "── Destek / Direnç ──"
+sr_on  = input.bool(true, "S/R Seviyeleri Göster", group=grp_sr)
+sr_lb  = input.int(10,    "Pivot Lookback",  minval=5, maxval=30, group=grp_sr)
+
+grp_vwap = "── VWAP (sadece intraday) ──"
+vwap_on = input.bool(true, "VWAP Göster", group=grp_vwap)
+
+grp_mtf = "── Multi-Timeframe Trend ──"
+mtf_on = input.bool(true, "MTF Trend Göster", group=grp_mtf)
+mtf_tf = input.timeframe("D", "Konfirmasyon Zaman Dilimi", group=grp_mtf)
+
+// ══════════════════════════════════════════════════════════════
+// EMA HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+ema8   = ta.ema(close, 8)
+ema21  = ta.ema(close, 21)
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+
+// EMA trendin yönü
+ema_yukari = ema8 > ema21 and ema21 > ema50
+ema_asagi  = ema8 < ema21 and ema21 < ema50
+
+// Golden/Death Cross
+golden_cross = ta.crossover(ema50, ema200)
+death_cross  = ta.crossunder(ema50, ema200)
+
+// ══════════════════════════════════════════════════════════════
+// SUPERTREND
+// ══════════════════════════════════════════════════════════════
+[st_val, st_dir] = ta.supertrend(st_mult, st_per)
+
+// st_dir < 0 = yükseliş (fiyat SuperTrend üstünde)
+// st_dir > 0 = düşüş   (fiyat SuperTrend altında)
+st_yukari = st_dir < 0
+st_asagi  = st_dir > 0
+st_alim   = ta.crossunder(st_dir, 0)   // Yükseliş başladı
+st_satim  = ta.crossover(st_dir,  0)   // Düşüş başladı
+
+// ══════════════════════════════════════════════════════════════
+// VWAP — Sadece intraday grafiklerde anlamlı
+// ══════════════════════════════════════════════════════════════
+vwap_val = ta.vwap(hlc3)
+vwap_yukari = close >= vwap_val
+
+// ══════════════════════════════════════════════════════════════
+// MTF TREND — Daily EMA 50/200
+// ══════════════════════════════════════════════════════════════
+[mtf_close, mtf_e50, mtf_e200] = request.security(
+    syminfo.tickerid, mtf_tf,
+    [close, ta.ema(close, 50), ta.ema(close, 200)],
+    lookahead=barmerge.lookahead_off)
+
+mtf_yukari = mtf_e50 > mtf_e200
+mtf_asagi  = mtf_e50 < mtf_e200
+
+// Genel trend kararı (SuperTrend + MTF EMA)
+genel_yukari = st_yukari and mtf_yukari
+genel_asagi  = st_asagi  and mtf_asagi
+
+// ══════════════════════════════════════════════════════════════
+// DİNAMİK S/R SEVİYELERİ — Son 3 pivot
+// ══════════════════════════════════════════════════════════════
+ph = ta.pivothigh(high, sr_lb, sr_lb)
+pl = ta.pivotlow(low,   sr_lb, sr_lb)
+
+var float res1 = na, var float res2 = na, var float res3 = na
+var float sup1 = na, var float sup2 = na, var float sup3 = na
+
+if not na(ph)
+    res3 := res2
+    res2 := res1
+    res1 := ph
+
+if not na(pl)
+    sup3 := sup2
+    sup2 := sup1
+    sup1 := pl
+
+// Fiyata yakın S/R için label
+sr_mesafe = ta.atr(14) * 0.5
+fiyat_dirence_yakin = not na(res1) and math.abs(close - res1) < sr_mesafe
+fiyat_destege_yakin = not na(sup1) and math.abs(close - sup1) < sr_mesafe
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — EMA'lar
+// ══════════════════════════════════════════════════════════════
+c_e8   = is_dark ? color.new(#FFD700, 0) : color.new(#F57F17, 0)  // Altın sarısı
+c_e21  = is_dark ? color.new(#42A5F5, 0) : color.new(#1565C0, 0)  // Mavi
+c_e50  = is_dark ? color.new(#FFA726, 0) : color.new(#E65100, 0)  // Turuncu
+c_e200 = is_dark ? color.new(#CE93D8, 0) : color.new(#6A1B9A, 0)  // Mor
+
+p_e8   = plot(ema8_on   ? ema8   : na, "EMA 8",   color=c_e8,   linewidth=1)
+p_e21  = plot(ema21_on  ? ema21  : na, "EMA 21",  color=c_e21,  linewidth=1)
+         plot(ema50_on  ? ema50  : na, "EMA 50",  color=c_e50,  linewidth=2)
+         plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
+
+// EMA 8/21 arası fill — yön hissini verir
+ema_fill_col = ema8 > ema21 ? color.new(C_BULL, 88) : color.new(C_BEAR, 88)
+fill(p_e8, p_e21, color=(ema_fill and ema8_on and ema21_on) ? ema_fill_col : na,
+     title="EMA 8/21 Fill")
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — SuperTrend
+// ══════════════════════════════════════════════════════════════
+st_col = st_yukari ? C_BULL : C_BEAR
+plot(st_on ? st_val : na, "SuperTrend", color=st_col, linewidth=2)
+
+plotshape(st_on and st_alim,  "ST Alım",  shape.triangleup,   location.belowbar, C_BULL, size=size.small)
+plotshape(st_on and st_satim, "ST Satım", shape.triangledown, location.abovebar, C_BEAR, size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — VWAP
+// ══════════════════════════════════════════════════════════════
+vwap_col = vwap_yukari ? color.new(C_BULL, 30) : color.new(C_BEAR, 30)
+plot(vwap_on and timeframe.isintraday ? vwap_val : na, "VWAP",
+     color=vwap_col, linewidth=1, style=plot.style_stepline_diamond)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — S/R Seviyeleri
+// ══════════════════════════════════════════════════════════════
+// Direnç seviyeleri — kırmızı tonları (güçlü→soluk)
+plot(sr_on ? res1 : na, "Direnç 1", color=color.new(C_BEAR, 20), linewidth=2, style=plot.style_circles)
+plot(sr_on ? res2 : na, "Direnç 2", color=color.new(C_BEAR, 50), linewidth=1, style=plot.style_circles)
+plot(sr_on ? res3 : na, "Direnç 3", color=color.new(C_BEAR, 70), linewidth=1, style=plot.style_circles)
+// Destek seviyeleri — yeşil tonları
+plot(sr_on ? sup1 : na, "Destek 1", color=color.new(C_BULL, 20), linewidth=2, style=plot.style_circles)
+plot(sr_on ? sup2 : na, "Destek 2", color=color.new(C_BULL, 50), linewidth=1, style=plot.style_circles)
+plot(sr_on ? sup3 : na, "Destek 3", color=color.new(C_BULL, 70), linewidth=1, style=plot.style_circles)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Golden/Death Cross İşaretleri
+// ══════════════════════════════════════════════════════════════
+plotshape(golden_cross, "Golden Cross", shape.star,    location.belowbar, C_WARN, size=size.normal)
+plotshape(death_cross,  "Death Cross",  shape.xcross,  location.abovebar, C_BEAR, size=size.normal)
+
+// ══════════════════════════════════════════════════════════════
+// BAR RENKLENDİRME
+// ══════════════════════════════════════════════════════════════
+bar_col = genel_yukari ? color.new(C_BULL, 60) :
+          genel_asagi  ? color.new(C_BEAR, 60) :
+          color.new(C_NEUT, 75)
+barcolor(bar_renk ? bar_col : na, title="Bar Rengi")
+
+// ══════════════════════════════════════════════════════════════
+// TREND DURUMU ETİKETİ
+// ══════════════════════════════════════════════════════════════
+if barstate.islast
+    trend_txt = genel_yukari ? "▲ YUKARI TREND" :
+                genel_asagi  ? "▼ AŞAĞI TREND"  :
+                st_yukari    ? "↗ ZAYIF YUKARI"  :
+                st_asagi     ? "↘ ZAYIF AŞAĞI"  : "~ KARARSIZ"
+
+    trend_col = genel_yukari ? C_BULL :
+                genel_asagi  ? C_BEAR :
+                C_NEUT
+
+    mtf_txt = mtf_yukari ? "[MTF: ↑]" : "[MTF: ↓]"
+
+    label.new(bar_index + 2, high,
+              trend_txt + "  " + mtf_txt,
+              color=color.new(trend_col, 80),
+              textcolor=trend_col,
+              style=label.style_label_left,
+              size=size.normal)
+
+// S/R uyarı etiketleri
+if barstate.isconfirmed and fiyat_dirence_yakin and sr_on
+    label.new(bar_index, high, "↑ DİR", color=color.new(C_BEAR, 60),
+              textcolor=C_BEAR, style=label.style_label_down, size=size.tiny)
+if barstate.isconfirmed and fiyat_destege_yakin and sr_on
+    label.new(bar_index, low, "↓ DES", color=color.new(C_BULL, 60),
+              textcolor=C_BULL, style=label.style_label_up, size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(golden_cross,              "Golden Cross",       "🟡 GOLDEN CROSS | {{ticker}} @ {{close}}")
+alertcondition(death_cross,               "Death Cross",        "🔴 DEATH CROSS  | {{ticker}} @ {{close}}")
+alertcondition(st_alim,                   "SuperTrend Alım",    "🟢 SuperTrend ALIM  | {{ticker}} @ {{close}}")
+alertcondition(st_satim,                  "SuperTrend Satım",   "🔴 SuperTrend SATIM | {{ticker}} @ {{close}}")
+alertcondition(genel_yukari and st_alim,  "Güçlü Alım Sinyali", "🚀 GÜÇLÜ ALIM — MTF+ST | {{ticker}} @ {{close}}")
+alertcondition(fiyat_dirence_yakin,       "Dirence Yakın",      "⚠️ Dirence Yakın: {{ticker}} @ {{close}}")
+alertcondition(fiyat_destege_yakin,       "Desteğe Yakın",      "⚠️ Desteğe Yakın: {{ticker}} @ {{close}}")
+
+if barstate.isconfirmed
+    if golden_cross
+        alert("🟡 GOLDEN CROSS: " + syminfo.ticker + " | " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)
+    if death_cross
+        alert("🔴 DEATH CROSS: " + syminfo.ticker + " | " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)
+    if st_alim
+        alert('{"event":"ST_ALIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+    if st_satim
+        alert('{"event":"ST_SATIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)

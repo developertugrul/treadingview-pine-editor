@@ -1,0 +1,210 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         KRİPTO MOMENTUM PAKETİ — v6                          ║
+// ║  RSI · MACD · Stoch · Hacim · BTC Dominans · OBV            ║
+// ║  Kripto için uyarlanmış adaptif eşikler                      ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Kripto Momentum Paketi", overlay=false, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00E676, 0) : color.new(#00701A, 0)
+C_BEAR   = is_dark ? color.new(#FF1744, 0) : color.new(#B71C1C, 0)
+C_NEUT   = is_dark ? color.new(#9E9E9E, 0) : color.new(#424242, 0)
+C_ACCENT = is_dark ? color.new(#40C4FF, 0) : color.new(#0277BD, 0)
+C_WARN   = is_dark ? color.new(#FFD740, 0) : color.new(#F57F17, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_rsi = "── RSI ──"
+rsi_per    = input.int(14,   "RSI Periyot", minval=2, maxval=50, group=grp_rsi)
+rsi_adaptif = input.bool(true,"Adaptif OB/OS Eşikler", group=grp_rsi)
+// Kripto için default OB/OS: 75/25 (daha volatil)
+rsi_ob     = input.int(75,   "OB (Sabit)", minval=60, maxval=95, group=grp_rsi)
+rsi_os     = input.int(25,   "OS (Sabit)", minval=5,  maxval=40, group=grp_rsi)
+
+grp_macd = "── MACD ──"
+macd_on  = input.bool(true, "MACD Göster", group=grp_macd)
+macd_f   = input.int(12,    "Hızlı", minval=2, group=grp_macd)
+macd_s   = input.int(26,    "Yavaş", minval=5, group=grp_macd)
+macd_sig_per = input.int(9, "Sinyal", minval=2, group=grp_macd)
+
+grp_stoch = "── Stochastic RSI ──"
+srsi_on  = input.bool(true, "Stoch RSI Göster", group=grp_stoch)
+srsi_len = input.int(14,    "RSI Uzunluk", minval=2, group=grp_stoch)
+srsi_k   = input.int(3,     "%K Smooth", minval=1, group=grp_stoch)
+srsi_d   = input.int(3,     "%D Smooth", minval=1, group=grp_stoch)
+
+grp_vol = "── Hacim ──"
+vol_on  = input.bool(true, "Hacim Analizi", group=grp_vol)
+vol_ma  = input.int(20,    "Hacim MA Periyot", minval=5, group=grp_vol)
+
+grp_div = "── Diverjans ──"
+div_on = input.bool(true, "RSI Diverjansı Tespit Et", group=grp_div)
+div_lb = input.int(5,     "Diverjans Lookback", minval=2, maxval=20, group=grp_div)
+
+// ══════════════════════════════════════════════════════════════
+// RSI
+// ══════════════════════════════════════════════════════════════
+rsi_val  = ta.rsi(close, rsi_per)
+rsi_sig  = ta.ema(rsi_val, 9)
+rsi_avg  = ta.sma(rsi_val, 50)
+rsi_std  = ta.stdev(rsi_val, 50)
+ob_aktif = rsi_adaptif ? math.min(rsi_avg + rsi_std * 1.5, 88.0) : float(rsi_ob)
+os_aktif = rsi_adaptif ? math.max(rsi_avg - rsi_std * 1.5, 12.0) : float(rsi_os)
+
+rsi_asiri_alim  = rsi_val >= ob_aktif
+rsi_asiri_satim = rsi_val <= os_aktif
+rsi_ob_cikis    = ta.crossunder(rsi_val, ob_aktif)
+rsi_os_cikis    = ta.crossover(rsi_val,  os_aktif)
+
+// ══════════════════════════════════════════════════════════════
+// RSI DİVERJANS
+// ══════════════════════════════════════════════════════════════
+price_ph = ta.pivothigh(high, div_lb, div_lb)
+price_pl = ta.pivotlow(low,   div_lb, div_lb)
+rsi_ph   = ta.pivothigh(rsi_val, div_lb, div_lb)
+rsi_pl   = ta.pivotlow(rsi_val,  div_lb, div_lb)
+
+var float prev_pph = na, var float prev_rph = na
+var float prev_ppl = na, var float prev_rpl = na
+
+if not na(price_ph) and not na(rsi_ph) : prev_pph := price_ph; prev_rph := rsi_ph
+if not na(price_pl) and not na(rsi_pl) : prev_ppl := price_pl; prev_rpl := rsi_pl
+
+bearish_div   = div_on and not na(price_ph) and not na(rsi_ph) and not na(prev_pph) and price_ph > prev_pph and rsi_ph < prev_rph
+bullish_div   = div_on and not na(price_pl) and not na(rsi_pl) and not na(prev_ppl) and price_pl < prev_ppl and rsi_pl > prev_rpl
+hidden_b_div  = div_on and not na(price_pl) and not na(rsi_pl) and not na(prev_ppl) and price_pl > prev_ppl and rsi_pl < prev_rpl
+
+// ══════════════════════════════════════════════════════════════
+// STOCHASTIC RSI (Kripto'da çok kullanılır)
+// ══════════════════════════════════════════════════════════════
+rsi_for_stoch = ta.rsi(close, srsi_len)
+rsi_lowest    = ta.lowest(rsi_for_stoch, 14)
+rsi_highest   = ta.highest(rsi_for_stoch, 14)
+stoch_rsi_raw = rsi_highest - rsi_lowest > 0 ? (rsi_for_stoch - rsi_lowest) / (rsi_highest - rsi_lowest) * 100 : 50.0
+stoch_rsi_k   = ta.sma(stoch_rsi_raw, srsi_k)
+stoch_rsi_d   = ta.sma(stoch_rsi_k, srsi_d)
+srsi_cross_up   = ta.crossover(stoch_rsi_k,  stoch_rsi_d)
+srsi_cross_down = ta.crossunder(stoch_rsi_k, stoch_rsi_d)
+srsi_ob = stoch_rsi_k >= 80
+srsi_os = stoch_rsi_k <= 20
+
+// ══════════════════════════════════════════════════════════════
+// MACD
+// ══════════════════════════════════════════════════════════════
+[macd_line, macd_signal, macd_hist] = ta.macd(close, macd_f, macd_s, macd_sig_per)
+macd_pozitif    = macd_hist > 0
+macd_yukari     = macd_hist > macd_hist[1]
+macd_cross_up   = ta.crossover(macd_line,  macd_signal)
+macd_cross_down = ta.crossunder(macd_line, macd_signal)
+
+// MACD normalize (0-100 panelinde göster)
+macd_avg  = ta.sma(macd_hist, 100)
+macd_std  = ta.stdev(macd_hist, 100)
+macd_z    = macd_std != 0 ? (macd_hist - macd_avg) / macd_std : 0.0
+macd_norm = math.max(0.0, math.min(100.0, 50.0 + macd_z * 15.0))
+
+// ══════════════════════════════════════════════════════════════
+// HACİM
+// ══════════════════════════════════════════════════════════════
+vol_ort  = ta.sma(volume, vol_ma)
+rel_vol  = vol_ort > 0 ? volume / vol_ort : 1.0
+vol_spike = rel_vol >= 2.5   // Kripto için 2.5x (daha gürültülü)
+obv_val  = ta.obv
+obv_ema  = ta.ema(obv_val, 20)
+obv_yukari = obv_val > obv_ema
+
+// ══════════════════════════════════════════════════════════════
+// MOMENTUM SKORU
+// ══════════════════════════════════════════════════════════════
+skor_raw = (rsi_val > 50 ? 20 : -20) +
+           (macd_pozitif ? 20 : -20) +
+           (macd_yukari  ? 10 : -10) +
+           (obv_yukari   ? 15 : -15) +
+           (srsi_cross_up   ? 10 : 0) +
+           (rsi_asiri_satim ? 10 : 0)
+momentum_skor = math.max(0.0, math.min(100.0, 50.0 + skor_raw * (50.0/75.0)))
+skor_rengi = momentum_skor >= 65 ? C_BULL : momentum_skor <= 35 ? C_BEAR : C_WARN
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — RSI
+// ══════════════════════════════════════════════════════════════
+rsi_col = rsi_asiri_alim ? C_BEAR : rsi_asiri_satim ? C_BULL : C_ACCENT
+plot(rsi_val, "RSI", color=rsi_col, linewidth=2)
+plot(rsi_sig, "RSI Sinyal", color=color.new(C_WARN, 20), linewidth=1)
+
+ob_p = plot(ob_aktif, "OB",  color=color.new(C_BEAR, 60), linewidth=1)
+os_p = plot(os_aktif, "OS",  color=color.new(C_BULL, 60), linewidth=1)
+       plot(50,        "50", color=color.new(C_NEUT, 70), linewidth=1)
+fill(ob_p, plot(100, display=display.none), color=color.new(C_BEAR, 92))
+fill(os_p, plot(0,   display=display.none), color=color.new(C_BULL, 92))
+
+r_p  = plot(rsi_val, display=display.none)
+rs_p = plot(rsi_sig, display=display.none)
+fill(r_p, rs_p, color=rsi_val > rsi_sig ? color.new(C_BULL, 82) : color.new(C_BEAR, 82))
+
+plotshape(rsi_ob_cikis, "OB Çıkış", shape.triangledown, location.top,    C_BEAR, size=size.tiny)
+plotshape(rsi_os_cikis, "OS Çıkış", shape.triangleup,   location.bottom, C_BULL, size=size.tiny)
+plotshape(bearish_div,  "Bear Div", shape.xcross,  location.top,    C_BEAR, size=size.small)
+plotshape(bullish_div,  "Bull Div", shape.circle,  location.bottom, C_BULL, size=size.small)
+plotshape(hidden_b_div, "Gizli BD", shape.diamond, location.bottom, color.new(C_BULL,40), size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Stochastic RSI
+// ══════════════════════════════════════════════════════════════
+plot(srsi_on ? stoch_rsi_k : na, "Stoch RSI %K", color=color.new(C_ACCENT, 0),  linewidth=1)
+plot(srsi_on ? stoch_rsi_d : na, "Stoch RSI %D", color=color.new(C_WARN,   40), linewidth=1)
+plotshape(srsi_on and srsi_cross_up   and srsi_os, "StochRSI Al",  shape.triangleup,   location.bottom, C_BULL, size=size.tiny)
+plotshape(srsi_on and srsi_cross_down and srsi_ob, "StochRSI Sat", shape.triangledown, location.top,    C_BEAR, size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — MACD Normalize
+// ══════════════════════════════════════════════════════════════
+macd_h_col = macd_pozitif and macd_yukari  ? color.new(C_BULL, 20) :
+             macd_pozitif                  ? color.new(C_BULL, 60) :
+             not macd_yukari               ? color.new(C_BEAR, 20) :
+             color.new(C_BEAR, 60)
+plot(macd_on ? macd_norm : na, "MACD Norm", color=macd_h_col, linewidth=2, style=plot.style_histogram)
+plotshape(macd_on and macd_cross_up,   "MACD Al",  shape.triangleup,   location.bottom, C_BULL, size=size.tiny)
+plotshape(macd_on and macd_cross_down, "MACD Sat", shape.triangledown, location.top,    C_BEAR, size=size.tiny)
+
+// Momentum skoru arka plan
+plot(momentum_skor, "Momentum Skoru", color=color.new(skor_rengi, 50), linewidth=1, style=plot.style_stepline)
+bgcolor(vol_on and vol_spike ? color.new(C_WARN, 90) : na, title="Hacim Spike")
+
+// ══════════════════════════════════════════════════════════════
+// ETİKET
+// ══════════════════════════════════════════════════════════════
+if barstate.islast
+    rsi_d  = rsi_asiri_alim ? "AŞIRI ALIM" : rsi_asiri_satim ? "AŞIRI SATIM" : rsi_val > 50 ? "YÜKSELİŞ" : "DÜŞÜŞ"
+    srsi_d = srsi_ob ? "OB" : srsi_os ? "OS" : stoch_rsi_k > stoch_rsi_d ? "↑" : "↓"
+    label.new(bar_index + 2, rsi_val,
+              "RSI:" + str.tostring(rsi_val,"#.#") + " [" + rsi_d + "]\n" +
+              "StochRSI: " + str.tostring(stoch_rsi_k,"#.#") + " [" + srsi_d + "]\n" +
+              "Skor: " + str.tostring(momentum_skor,"#") + "/100",
+              color=color.new(skor_rengi, 80), textcolor=skor_rengi,
+              style=label.style_label_left, size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(rsi_os_cikis,    "RSI OS Çıkış (AL)",   "🟢 Kripto RSI Aşırı Satımdan Döndü | {{ticker}}")
+alertcondition(rsi_ob_cikis,    "RSI OB Çıkış (SAT)",  "🔴 Kripto RSI Aşırı Alımdan Döndü | {{ticker}}")
+alertcondition(bullish_div,     "Bullish Diverjans",    "🟢 Bullish Div | {{ticker}} @ {{close}}")
+alertcondition(bearish_div,     "Bearish Diverjans",    "🔴 Bearish Div | {{ticker}} @ {{close}}")
+alertcondition(macd_cross_up,   "MACD Al",              "🟢 MACD Kesişim AL | {{ticker}}")
+alertcondition(macd_cross_down, "MACD Sat",             "🔴 MACD Kesişim SAT | {{ticker}}")
+alertcondition(vol_spike,       "Hacim Spike",          "⚡ Kripto Hacim Spike | {{ticker}} Hacim: {{volume}}")
+alertcondition(srsi_cross_up and srsi_os, "StochRSI OS Al", "🟢 StochRSI OS Kesişim | {{ticker}}")
+
+if barstate.isconfirmed
+    if bullish_div
+        alert('{"event":"KRIPTO_BULL_DIV","ticker":"' + syminfo.ticker + '","rsi":' + str.tostring(rsi_val,"#.#") + ',"price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)
+    if vol_spike
+        alert("⚡ Kripto Hacim Spike: " + syminfo.ticker + " | " + str.tostring(rel_vol,"#.##") + "x", alert.freq_once_per_bar_close)

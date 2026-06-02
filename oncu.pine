@@ -1,0 +1,30 @@
+//@version=3
+study(title="Ö N C Ü", shorttitle="Ö N C Ü")
+len = input(9, minval=1, title="Length")
+
+high_ = highest(hl2, len)
+low_ = lowest(hl2, len)
+
+round_(val) => val > .99 ? .999 : val < -.99 ? -.999 : val
+
+value = 0.0
+value := round_(.66 * ((hl2 - low_) / max(high_ - low_, .001) - .5) + .67 * nz(value[1]))
+
+fish1 = 0.0
+fish1 := .5 * log((1 + value) / max(1 - value, .001)) + .5 * nz(fish1[1])
+
+fish2 = fish1[1]
+
+hline(1.5, color=orange)
+hline(0.75)
+hline(0, color=orange)
+hline(-0.75)
+hline(-1.5, color=orange)
+plot(fish1, color=black, title="Fisher")
+plot(fish2, color=green, title="Trigger")
+up5 =crossover(fish1,fish2) and fish1<-1.5
+down5 = crossunder(fish1,fish2) and fish1>0
+plotchar(up5, title="buy", char='B ', location=location.bottom, color=black, transp=0, offset=0,size=size.tiny)
+plotchar(down5, title="sell",char='S', offset=0, location=location.top, color=black, transp=0,size=size.tiny)
+alertcondition(up5, title='buy', message='go long')
+alertcondition(down5, title='sell', message='go  short')

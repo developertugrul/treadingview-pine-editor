@@ -1,0 +1,217 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         PİYASA REJİMİ FİLTRESİ — v6                        ║
+// ║  Bull / Bear / Yatay · ADX · Trend Gücü · Endeks Filtresi   ║
+// ║  ► TÜM SİNYALLERDEN ÖNCE BU DOSYAYA BAK                    ║
+// ║  ► BULL REJİMİ → Sadece LONG sinyallerini değerlendir       ║
+// ║  ► BEAR REJİMİ → LONG sinyallerini yoksay veya çok dikkatli ║
+// ╚══════════════════════════════════════════════════════════════╝
+// PROFESYONEL KURAL:
+// Rejim = Bear → Sadece kısa vadeli scalp veya hiç işlem yapma
+// Rejim = Bull → Confluence ≥ 6 olunca long değerlendir
+// Rejim = Yatay → Sadece sıkışma kırılımlarında (volatilite-suite ile)
+indicator("Piyasa Rejimi Filtresi", overlay=false, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_makro = "── Makro Endeks Filtresi ──"
+// BIST hisseleri → BIST:XU100
+// S&P hisseleri → SP:SPX
+// Kripto → CRYPTOCAP:TOTAL
+// Emtia → TVC:DXY (ters)
+endeks_sym  = input.symbol("BIST:XU100", "Makro Endeks Sembolü", group=grp_makro)
+endeks_tf   = input.timeframe("W", "Endeks Zaman Dilimi (Haftalık önerilir)", group=grp_makro)
+endeks_on   = input.bool(true, "Endeks Filtresi Aktif", group=grp_makro)
+
+grp_trend = "── Trend Gücü (ADX) ──"
+adx_per   = input.int(14,    "ADX Periyot",          minval=5, group=grp_trend)
+adx_trend = input.int(25,    "ADX Trend Eşiği (>25=Trend)", minval=15, maxval=50, group=grp_trend)
+adx_guclu = input.int(40,    "ADX Güçlü Trend Eşiği", minval=30, maxval=70, group=grp_trend)
+
+grp_ema = "── EMA Yapısı ──"
+fast_per  = input.int(50,  "Hızlı EMA",  minval=5,  group=grp_ema)
+slow_per  = input.int(200, "Yavaş EMA",  minval=50, group=grp_ema)
+
+// ══════════════════════════════════════════════════════════════
+// MEVCUT SEMBOL HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+ema_fast  = ta.ema(close, fast_per)
+ema_slow  = ta.ema(close, slow_per)
+
+// ADX
+[diplus, diminus, adx_val] = ta.dmi(adx_per, adx_per)
+
+// Fiyat momentum (ROC — Rate of Change)
+roc_20    = close > 0 and close[20] > 0 ? (close - close[20]) / close[20] * 100 : 0.0
+roc_50    = close > 0 and close[50] > 0 ? (close - close[50]) / close[50] * 100 : 0.0
+
+// Volatilite rejimi (BB genişlik persentili)
+bb_basis = ta.sma(close, 20)
+bb_dev   = ta.stdev(close, 20)
+bb_width = bb_dev * 2 / bb_basis
+bb_pct   = ta.percentrank(bb_width, 50)  // 0-100, düşük = sıkışma
+
+// ══════════════════════════════════════════════════════════════
+// MAKRO ENDEKSİ ÇEK
+// ══════════════════════════════════════════════════════════════
+endeks_close    = request.security(endeks_sym, endeks_tf, close,             lookahead=barmerge.lookahead_off)
+endeks_ema200   = request.security(endeks_sym, endeks_tf, ta.ema(close,200), lookahead=barmerge.lookahead_off)
+endeks_ema50    = request.security(endeks_sym, endeks_tf, ta.ema(close,50),  lookahead=barmerge.lookahead_off)
+endeks_bull     = endeks_close > endeks_ema200 and endeks_ema50 > endeks_ema200
+
+// ══════════════════════════════════════════════════════════════
+// PİYASA REJİMİ TESPİTİ
+// ══════════════════════════════════════════════════════════════
+// Puan sistemi (0-6)
+rejim_puan = 0
+rejim_puan += close > ema_fast   ? 1 : 0  // Hızlı EMA üstünde
+rejim_puan += close > ema_slow   ? 1 : 0  // Yavaş EMA üstünde
+rejim_puan += ema_fast > ema_slow ? 1 : 0  // EMA hizalaması
+rejim_puan += diplus > diminus   ? 1 : 0  // DI+ > DI- (yükseliş baskısı)
+rejim_puan += roc_20 > 0         ? 1 : 0  // 20 bar momentum pozitif
+rejim_puan += endeks_on ? (endeks_bull ? 1 : 0) : 1  // Makro endeks
+
+// Rejim sınıflandırması
+rejim_bull  = rejim_puan >= 5   // 5-6 puan: BULL
+rejim_bear  = rejim_puan <= 1   // 0-1 puan: BEAR
+rejim_yatay = not rejim_bull and not rejim_bear  // 2-4 puan: YATAY/KARIŞIk
+
+// ADX trend gücü
+trend_guclu = adx_val >= adx_guclu   // ≥40: çok güçlü trend
+trend_var   = adx_val >= adx_trend   // ≥25: trend var
+trend_yok   = adx_val < adx_trend    // <25: yatay piyasa
+
+// Volatilite durumu
+vol_siki    = bb_pct <= 20   // Düşük volatilite — patlama bekleniyor
+vol_yuksek  = bb_pct >= 75   // Yüksek volatilite — dikkat
+
+// ══════════════════════════════════════════════════════════════
+// REJİM DEĞİŞİMİ TESPİTİ
+// ══════════════════════════════════════════════════════════════
+rejim_bull_basladi  = rejim_bull  and not rejim_bull[1]
+rejim_bear_basladi  = rejim_bear  and not rejim_bear[1]
+rejim_yatay_basladi = rejim_yatay and not rejim_yatay[1]
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Rejim puanı çizgisi (0-6)
+// ══════════════════════════════════════════════════════════════
+rejim_col = rejim_bull ? C_BULL : rejim_bear ? C_BEAR : C_WARN
+plot(float(rejim_puan), "Rejim Puanı (0-6)",
+     color=rejim_col, linewidth=3, style=plot.style_histogram)
+
+// Eşik çizgileri
+plot(5.0, "Bull Eşiği (5)",  color=color.new(C_BULL, 50), linewidth=1, style=plot.style_dashed)
+plot(2.0, "Bear Eşiği (2)",  color=color.new(C_BEAR, 50), linewidth=1, style=plot.style_dashed)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — ADX
+// ══════════════════════════════════════════════════════════════
+adx_col = trend_guclu ? C_ACCENT : trend_var ? color.new(C_ACCENT,40) : C_NEUT
+plot(adx_val, "ADX", color=adx_col, linewidth=1, style=plot.style_stepline)
+
+// ══════════════════════════════════════════════════════════════
+// ARKA PLAN REJİME GÖRE
+// ══════════════════════════════════════════════════════════════
+bgcolor(rejim_bull  ? color.new(C_BULL, 95) : na, title="Bull Rejim Arka Plan")
+bgcolor(rejim_bear  ? color.new(C_BEAR, 95) : na, title="Bear Rejim Arka Plan")
+bgcolor(vol_siki    ? color.new(C_WARN, 92) : na, title="Düşük Volatilite")
+
+// ══════════════════════════════════════════════════════════════
+// PANEL TABLOSU
+// ══════════════════════════════════════════════════════════════
+var table tbl = table.new(position.top_right, 2, 9,
+                           border_width=1,
+                           border_color=is_dark ? color.new(#444444,0) : color.new(#CCCCCC,0),
+                           frame_width=1)
+
+if barstate.islast
+    ts = size.small
+    bg = is_dark ? color.new(#1A1A1A, 85) : color.new(#FAFAFA, 85)
+    tc = is_dark ? color.new(#FFFFFF, 0)  : color.new(#000000, 0)
+
+    // Başlık
+    rejim_txt = rejim_bull ? "BULL REJİMİ ▲" : rejim_bear ? "BEAR REJİMİ ▼" : "YATAY / KARIŞIK ~"
+    rejim_hdr = rejim_bull ? color.new(C_BULL,60) : rejim_bear ? color.new(C_BEAR,60) : color.new(C_WARN,60)
+    table.cell(tbl, 0, 0, "🔍 Piyasa Rejimi", text_color=tc, bgcolor=rejim_hdr, text_size=ts)
+    table.cell(tbl, 1, 0, rejim_txt,           text_color=tc, bgcolor=rejim_hdr, text_size=ts)
+
+    // Puan
+    table.cell(tbl, 0, 1, "Rejim Puanı",  text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 1, str.tostring(rejim_puan) + " / 6",
+               text_color=rejim_col, bgcolor=bg, text_size=ts)
+
+    // ADX
+    adx_txt = trend_guclu ? "ÇOK GÜÇLÜ" : trend_var ? "TREND VAR" : "YATAY"
+    table.cell(tbl, 0, 2, "ADX (" + str.tostring(adx_per) + ")", text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 2, str.tostring(adx_val,"#.#") + " — " + adx_txt,
+               text_color=adx_col, bgcolor=bg, text_size=ts)
+
+    // EMA yapısı
+    ema_txt  = close>ema_slow ? (ema_fast>ema_slow?"Hizalı ↑":"Karma") : "Hizalı ↓"
+    ema_col  = close>ema_slow ? C_BULL : C_BEAR
+    table.cell(tbl, 0, 3, "EMA Yapısı",  text_color=tc,     bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 3, ema_txt,       text_color=ema_col,bgcolor=bg, text_size=ts)
+
+    // ROC
+    roc_col  = roc_20 > 0 ? C_BULL : C_BEAR
+    table.cell(tbl, 0, 4, "Momentum",    text_color=tc,     bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 4, str.tostring(roc_20,"+#.##") + "% (20p)",
+               text_color=roc_col, bgcolor=bg, text_size=ts)
+
+    // Volatilite
+    vol_txt  = vol_siki ? "DÜŞÜK / SIKIŞ⚡" : vol_yuksek ? "YÜKSEK" : "NORMAL"
+    vol_col  = vol_siki ? C_WARN : C_NEUT
+    table.cell(tbl, 0, 5, "Volatilite",  text_color=tc,     bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 5, vol_txt,       text_color=vol_col,bgcolor=bg, text_size=ts)
+
+    // Makro endeks
+    endeks_txt = endeks_bull ? "↑ Endeks Pozitif" : "↓ Endeks Negatif"
+    endeks_col = endeks_bull ? C_BULL : C_BEAR
+    table.cell(tbl, 0, 6, endeks_sym,    text_color=tc,        bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 6, endeks_on ? endeks_txt : "Kapalı",
+               text_color=endeks_col, bgcolor=bg, text_size=ts)
+
+    // Öneri
+    oneri_txt = rejim_bull  and trend_var  ? "✅ LONG sinyallerini değerlendir" :
+                rejim_bull  and not trend_var ? "⚠️ LONG ama trend zayıf — dikkatli" :
+                rejim_bear  and trend_var  ? "🚫 LONG YAPMA — Bear + Trend güçlü" :
+                rejim_bear               ? "⚠️ LONG için çok dikkatli ol" :
+                vol_siki                 ? "⏳ Patlama bekle (sıkışma)" :
+                "🔄 Seçici ol — trend belirsiz"
+    oneri_col = rejim_bull and trend_var ? C_BULL :
+                rejim_bear and trend_var ? C_BEAR : C_WARN
+    table.cell(tbl, 0, 7, "Öneri", text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 7, oneri_txt, text_color=oneri_col, bgcolor=bg, text_size=ts)
+
+    // Skor filtresi
+    min_skor_txt = rejim_bull ? "Min Skor: 6/10 yeterli" :
+                   rejim_yatay ? "Min Skor: 7/10 gerekli" : "Min Skor: 8/10 — çok seçici ol"
+    min_skor_col = rejim_bull ? C_BULL : rejim_yatay ? C_WARN : C_BEAR
+    table.cell(tbl, 0, 8, "Sinyal Filtresi", text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 8, min_skor_txt, text_color=min_skor_col, bgcolor=bg, text_size=ts)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(rejim_bull_basladi,  "Bull Rejimi Başladı",  "🟢 BULL REJİMİ BAŞLADI | {{ticker}} — Long sinyallerini değerlendir")
+alertcondition(rejim_bear_basladi,  "Bear Rejimi Başladı",  "🔴 BEAR REJİMİ BAŞLADI | {{ticker}} — Long yapmaktan kaçın!")
+alertcondition(rejim_yatay_basladi, "Yatay Rejim Başladı",  "🟡 PİYASA YATAY | {{ticker}} — Breakout bekle")
+
+if barstate.isconfirmed
+    if rejim_bull_basladi
+        alert('{"event":"BULL_REJIM","ticker":"' + syminfo.ticker + '","puan":' + str.tostring(rejim_puan) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+    if rejim_bear_basladi
+        alert('{"event":"BEAR_REJIM","ticker":"' + syminfo.ticker + '","puan":' + str.tostring(rejim_puan) + ',"tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)

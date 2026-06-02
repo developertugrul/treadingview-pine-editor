@@ -1,0 +1,38 @@
+//@version=3
+//Fisher
+
+
+study(title="öncü", shorttitle="Ö N C Ü", overlay=false)
+
+lngth = input(09, minval=1, title="Length")
+enyuk = highest(hl2, lngth)
+endus = lowest(hl2, lngth)
+
+round_(val) => val > .99 ? .999 : val < -.99 ? -.999 : val
+
+value = 0.0
+value := round_(.66 * ((hl2 - endus) / max(enyuk - endus, .001) - .5) + .67 * nz(value[1]))
+
+fish1 = 0.0
+fish1 := .5 * log((1 + value) / max(1 - value, .001)) + .5 * nz(fish1[1])
+
+fish2 = fish1[1]
+
+hline(1.50, title="+2.00 Line",  linewidth=1, color=orange)
+hline(0.75, title="+1.00 Line", linewidth=1, color=orange)
+hline(00.00, title="00.00 Line",  linewidth=1, color=black)
+hline(-0.75, title="-1.00 Line",  linewidth=1, color=orange)
+hline(-1.50, title="-2.00 Line",  linewidth=1, color=orange)
+
+plot(fish1, title="Fisher", style=line, linewidth=1, color=blue, transp=0)
+plot(fish2, title="Trigger", style=line, linewidth=1, color=green, transp=0)
+
+upcutoff = input(0, title="Up Limit")
+dncutoff = input(-1.0, title="Dn Limit")
+
+upmove = crossover(fish1, fish2) and fish1 < dncutoff
+dnmove = crossunder(fish1, fish2) and fish1 > upcutoff
+
+plotshape(upmove, title="Buy", style=shape.labelup, location=location.bottom, color=blue, transp=0, size=size.auto, text="AL", textcolor=white)
+plotshape(dnmove, title="Sell", style=shape.labeldown, location=location.top, color=black, transp=0, size=size.auto, text="SAT", textcolor=white)
+

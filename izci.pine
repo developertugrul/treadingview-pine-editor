@@ -1,0 +1,27 @@
+//@version=4
+study(shorttitle=" İ Z C İ", title=" İ Z C İ", overlay=true, resolution="")
+length = input(20, minval=1)
+src = input(close, title="Source")
+mult = input(2.0, minval=0.001, maxval=50, title="StdDev")
+basis = sma(src, length)
+dev = mult * stdev(src, length)
+upper = basis + dev
+lower = basis - dev
+offset = input(0, "Offset", type = input.integer, minval = -500, maxval = 500)
+plot(basis, "Basis", color=color.black, offset = offset)
+p1 = plot(upper, "Upper", color=color.red, offset = offset)
+p2 = plot(lower, "Lower", color=color.red, offset = offset)
+fill(p1, p2, title = "Background", color=#198787, transp=95)
+
+
+
+ema5 = ema(close,5)
+ema13 = ema(close,13)
+
+plot(cross(ema5, ema13) and ema5[1] < ema13[1] ? ema5: na, title="BUY", linewidth=4, color=color.blue)
+plot(cross(ema5, ema13) and ema5[1] > ema13[1] ? ema5 : na, title="SELL", linewidth=4, color=color.red)
+
+plotshape(cross(ema5, ema13) and ema5[1] < ema13[1] ? true : na, style=shape.triangleup, text="AL ",color=color.blue,size=size.small, location=location.belowbar,transp=0)
+plotshape(cross(ema5, ema13) and ema5[1] > ema13[1] ? true : na, style=shape.triangledown, text="SAT",color=color.red,size=size.small, location=location.abovebar,transp=0)
+
+barcolor(cross(ema5, ema13) and ema5[1] < ema13[1] ? color.blue: cross(ema5, ema13) and ema5[1] > ema13[1] ? color.purple: close < open ? color.yellow: color.aqua)

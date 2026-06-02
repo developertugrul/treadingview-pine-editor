@@ -1,0 +1,45 @@
+//@version=4
+study("PAS ", overlay = false)
+
+rsi_length           = input(14, title = "A1", type = input.integer, minval = 1)
+rsi_smooth_length    = input(9, title = "A2", type = input.integer, minval = 1)
+rsi_threshold_period = input(25, title = "A3", type = input.integer, minval = 1)
+rsi_overbought       = input(0.8, title = "A4", type = input.float, minval = 0, maxval = 1)
+rsi_oversold         = input(0.2, title = "A5", type = input.float, minval = 0, maxval = 1)
+
+tma_enable = input(false, title = "A6")
+tma_length = input(3, title = "A7", minval = 2)
+tma_factor = input(1, title = "A8", step = 0.1, minval = 0.1)
+
+get_ift(values, smooth_length) =>
+    smoothed = wma(0.1 * values, smooth_length)
+    (exp(2 * smoothed) - 1) / (exp(2 * smoothed) + 1)
+
+get_gd(values, length, factor) =>
+    ema(values, length) * (1 + factor) - ema(ema(values, length), length) * factor
+
+get_tma(values, length, factor) =>
+    get_gd(get_gd(get_gd(values, length, factor), length, factor), length, factor)
+
+values = tma_enable ? get_tma(close, tma_length, tma_factor) : close
+rsi = rsi(values, rsi_length)
+ift = get_ift(rsi - 50, rsi_smooth_length)
+
+min = lowest(ift, rsi_threshold_period)
+max = highest(ift, rsi_threshold_period)
+
+range = max - min
+
+top = min + rsi_overbought * range
+bot = min + rsi_oversold * range
+mid = min + 0.5 * range
+
+signal = plot(ift, color = ift > top ? color.green : ift < bot ? color.red : color.green, linewidth = 3)
+
+upper = plot(top, color = color.blue, linewidth = 2)
+lower = plot(bot, color = color.blue, linewidth = 2)
+
+plot(mid, color = color.black, linewidth = 2)
+
+fill(signal, upper, color = ift > top ? color.green : na, transp = 80)
+fill(signal, lower, color = ift < bot ? color.red : na, transp = 80)

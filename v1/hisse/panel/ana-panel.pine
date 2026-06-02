@@ -1,0 +1,231 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║        HİSSE ANA PANELİ (DASHBOARD) — v6                    ║
+// ║  Multi-Timeframe Özet Tablosu · Tüm İndikatörler Bir Arada  ║
+// ║  Birlikte Kullan: trend + momentum + volatilite + sinyal     ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Hisse Ana Panel", overlay=true, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL     = is_dark ? color.new(#00C851, 0)  : color.new(#006621, 0)
+C_BEAR     = is_dark ? color.new(#FF4444, 0)  : color.new(#CC0000, 0)
+C_NEUT     = is_dark ? color.new(#9B9B9B, 0)  : color.new(#444444, 0)
+C_WARN     = is_dark ? color.new(#FFC107, 0)  : color.new(#E65100, 0)
+C_ACCENT   = is_dark ? color.new(#2196F3, 0)  : color.new(#1565C0, 0)
+C_BG       = is_dark ? color.new(#1C1C1C, 90) : color.new(#FAFAFA, 90)
+C_BG_CELL  = is_dark ? color.new(#2D2D2D, 85) : color.new(#F0F0F0, 85)
+C_TEXT     = is_dark ? color.new(#FFFFFF, 0)  : color.new(#111111, 0)
+C_BORDER   = is_dark ? color.new(#444444, 0)  : color.new(#CCCCCC, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_panel = "── Panel Ayarları ──"
+panel_konum   = input.string("Sağ Üst",  "Panel Konumu",
+                options=["Sağ Üst","Sağ Alt","Sol Üst","Sol Alt","Orta Sağ"],
+                group=grp_panel)
+panel_boyut   = input.string("Normal",   "Panel Boyutu",
+                options=["Küçük","Normal","Büyük"],
+                group=grp_panel)
+mtf1   = input.timeframe("15",  "TF 1", group=grp_panel)
+mtf2   = input.timeframe("60",  "TF 2", group=grp_panel)
+mtf3   = input.timeframe("240", "TF 3", group=grp_panel)
+mtf4   = input.timeframe("D",   "TF 4", group=grp_panel)
+
+// ══════════════════════════════════════════════════════════════
+// MEVCUT ZAMAN DİLİMİ HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+// Trend
+ema50_cur  = ta.ema(close, 50)
+ema200_cur = ta.ema(close, 200)
+[st_cur, st_dir_cur] = ta.supertrend(3.0, 10)
+
+// RSI
+rsi_cur = ta.rsi(close, 14)
+
+// MACD
+[macd_l_cur, macd_s_cur, macd_h_cur] = ta.macd(close, 12, 26, 9)
+
+// Volatilite (BB Squeeze)
+bb_up_cur = ta.sma(close, 20) + 2.0 * ta.stdev(close, 20)
+bb_lo_cur = ta.sma(close, 20) - 2.0 * ta.stdev(close, 20)
+kc_up_cur = ta.ema(close, 20) + 1.5 * ta.atr(20)
+kc_lo_cur = ta.ema(close, 20) - 1.5 * ta.atr(20)
+sq_cur    = bb_up_cur < kc_up_cur and bb_lo_cur > kc_lo_cur
+
+// Hacim
+vol_avg_cur = ta.sma(volume, 20)
+rel_vol_cur = vol_avg_cur > 0 ? volume / vol_avg_cur : 1.0
+
+// Momentum skoru (basit)
+def_skor_cur = (close > ema50_cur ? 2 : -2) +
+               (close > ema200_cur ? 2 : -2) +
+               (st_dir_cur < 0 ? 2 : -2) +
+               (rsi_cur > 50 ? 1 : -1) +
+               (macd_h_cur > 0 ? 1 : -1) +
+               (rel_vol_cur > 1.2 ? 2 : 0)
+skor_cur = math.max(0.0, math.min(10.0, (def_skor_cur + 10.0) / 2.0))
+
+// ══════════════════════════════════════════════════════════════
+// MULTI-TIMEFRAME VERİLERİ
+// ══════════════════════════════════════════════════════════════
+f_skor(tf) =>
+    _e50  = request.security(syminfo.tickerid, tf, ta.ema(close,50),  lookahead=barmerge.lookahead_off)
+    _e200 = request.security(syminfo.tickerid, tf, ta.ema(close,200), lookahead=barmerge.lookahead_off)
+    _rsi  = request.security(syminfo.tickerid, tf, ta.rsi(close,14),  lookahead=barmerge.lookahead_off)
+    [_macd,_sig,_hist] = request.security(syminfo.tickerid, tf, ta.macd(close,12,26,9), lookahead=barmerge.lookahead_off)
+    [_st, _stdir] = request.security(syminfo.tickerid, tf, ta.supertrend(3.0,10), lookahead=barmerge.lookahead_off)
+    _cl   = request.security(syminfo.tickerid, tf, close, lookahead=barmerge.lookahead_off)
+    _sc = (_cl > _e50 ? 2 : -2) + (_cl > _e200 ? 2 : -2) + (_stdir < 0 ? 2 : -2) + (_rsi > 50 ? 1 : -1) + (_hist > 0 ? 1 : -1)
+    [_rsi, _hist > 0, _stdir < 0, _cl > _e200, math.max(0.0, math.min(10.0, (_sc + 8.0) / 1.6))]
+
+[rsi1, macd1_pos, st1_up, trend1, skor1] = f_skor(mtf1)
+[rsi2, macd2_pos, st2_up, trend2, skor2] = f_skor(mtf2)
+[rsi3, macd3_pos, st3_up, trend3, skor3] = f_skor(mtf3)
+[rsi4, macd4_pos, st4_up, trend4, skor4] = f_skor(mtf4)
+
+// ══════════════════════════════════════════════════════════════
+// YARDIMCI FONKSİYONLAR
+// ══════════════════════════════════════════════════════════════
+// Hücre rengi — değere göre
+cell_col(val, bull_thr, bear_thr) =>
+    val >= bull_thr ? C_BULL : val <= bear_thr ? C_BEAR : C_WARN
+
+// Boole → ok sembolü
+ok_symbol(b) => b ? "↑" : "↓"
+ok_col(b)    => b ? C_BULL : C_BEAR
+
+// RSI rengi
+rsi_color(r) => r >= 70 ? C_BEAR : r <= 30 ? C_BULL : r >= 55 ? color.new(C_BULL, 40) : r <= 45 ? color.new(C_BEAR, 40) : C_NEUT
+
+// Skor rengi
+skor_col(s) => s >= 7 ? C_BULL : s <= 3 ? C_BEAR : C_WARN
+
+// Squeeze metni
+sq_txt(s) => s ? "SIKIŞ⚡" : "Serbest"
+sq_c(s)   => s ? C_WARN : C_NEUT
+
+// ══════════════════════════════════════════════════════════════
+// TABLO OLUŞTUR
+// ══════════════════════════════════════════════════════════════
+// Konum belirleme
+tbl_pos = panel_konum == "Sağ Üst"  ? position.top_right    :
+          panel_konum == "Sağ Alt"  ? position.bottom_right  :
+          panel_konum == "Sol Üst"  ? position.top_left      :
+          panel_konum == "Sol Alt"  ? position.bottom_left   :
+          position.middle_right
+
+// Metin boyutu
+txt_boyut = panel_boyut == "Küçük" ? size.tiny   :
+            panel_boyut == "Büyük" ? size.normal  :
+            size.small
+
+var table tbl = table.new(tbl_pos, 7, 9,
+                           border_width=1,
+                           border_color=C_BORDER,
+                           frame_color=C_BORDER,
+                           frame_width=1)
+
+// Satır yüksekliği ve sütun genişliği
+if barstate.islast
+    // ── Başlık satırı ──
+    table.cell(tbl, 0, 0, "📊 " + syminfo.ticker,  text_color=C_TEXT, bgcolor=color.new(C_ACCENT, 70), text_size=txt_boyut)
+    table.cell(tbl, 1, 0, "Anlık",    text_color=C_TEXT, bgcolor=color.new(C_ACCENT, 70), text_size=txt_boyut)
+    table.cell(tbl, 2, 0, mtf1,       text_color=C_TEXT, bgcolor=color.new(C_ACCENT, 70), text_size=txt_boyut)
+    table.cell(tbl, 3, 0, mtf2,       text_color=C_TEXT, bgcolor=color.new(C_ACCENT, 70), text_size=txt_boyut)
+    table.cell(tbl, 4, 0, mtf3,       text_color=C_TEXT, bgcolor=color.new(C_ACCENT, 70), text_size=txt_boyut)
+    table.cell(tbl, 5, 0, mtf4,       text_color=C_TEXT, bgcolor=color.new(C_ACCENT, 70), text_size=txt_boyut)
+    table.cell(tbl, 6, 0, "Ref.",     text_color=C_TEXT, bgcolor=color.new(C_ACCENT, 70), text_size=txt_boyut)
+
+    // ── Fiyat satırı ──
+    fiyat_txt = str.tostring(close, "#.##")
+    degisim   = (close - close[1]) / close[1] * 100
+    degisim_txt = str.tostring(degisim, "+#.##") + "%"
+    fiyat_col = degisim >= 0 ? C_BULL : C_BEAR
+    table.cell(tbl, 0, 1, "Fiyat",      text_color=C_TEXT,    bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 1, fiyat_txt,    text_color=fiyat_col, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 1, degisim_txt,  text_color=fiyat_col, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 1, "",           text_color=C_NEUT,    bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 1, "",           text_color=C_NEUT,    bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 1, "",           text_color=C_NEUT,    bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 1, "vs dün",    text_color=C_NEUT,    bgcolor=C_BG_CELL, text_size=txt_boyut)
+
+    // ── Trend satırı ──
+    t_c  = st_dir_cur < 0 ? C_BULL : C_BEAR
+    t_t  = st_dir_cur < 0 ? "YUKARI" : "AŞAĞI"
+    table.cell(tbl, 0, 2, "Trend",          text_color=C_TEXT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 2, t_t,              text_color=t_c,    bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 2, ok_symbol(st1_up),text_color=ok_col(st1_up), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 2, ok_symbol(st2_up),text_color=ok_col(st2_up), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 2, ok_symbol(st3_up),text_color=ok_col(st3_up), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 2, ok_symbol(st4_up),text_color=ok_col(st4_up), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 2, "SuperTrend",    text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+
+    // ── EMA 200 satırı ──
+    ema_c  = close > ema200_cur ? C_BULL : C_BEAR
+    ema_t  = close > ema200_cur ? "Üstünde" : "Altında"
+    table.cell(tbl, 0, 3, "EMA 200",           text_color=C_TEXT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 3, ema_t,               text_color=ema_c,  bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 3, ok_symbol(trend1),   text_color=ok_col(trend1), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 3, ok_symbol(trend2),   text_color=ok_col(trend2), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 3, ok_symbol(trend3),   text_color=ok_col(trend3), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 3, ok_symbol(trend4),   text_color=ok_col(trend4), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 3, "Uzun Vade",        text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+
+    // ── RSI satırı ──
+    rsi_cur_txt = str.tostring(rsi_cur, "#.#")
+    table.cell(tbl, 0, 4, "RSI",                text_color=C_TEXT,       bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 4, rsi_cur_txt,          text_color=rsi_color(rsi_cur), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 4, str.tostring(rsi1,"#.#"), text_color=rsi_color(rsi1), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 4, str.tostring(rsi2,"#.#"), text_color=rsi_color(rsi2), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 4, str.tostring(rsi3,"#.#"), text_color=rsi_color(rsi3), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 4, str.tostring(rsi4,"#.#"), text_color=rsi_color(rsi4), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 4, "RSI(14)",           text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+
+    // ── MACD satırı ──
+    macd_c = macd_h_cur > 0 ? C_BULL : C_BEAR
+    macd_t = macd_h_cur > 0 ? (macd_h_cur > macd_h_cur[1] ? "↑POZ" : "↓POZ") : (macd_h_cur < macd_h_cur[1] ? "↓NEG" : "↑NEG")
+    table.cell(tbl, 0, 5, "MACD",              text_color=C_TEXT,  bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 5, macd_t,              text_color=macd_c,  bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 5, ok_symbol(macd1_pos),text_color=ok_col(macd1_pos), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 5, ok_symbol(macd2_pos),text_color=ok_col(macd2_pos), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 5, ok_symbol(macd3_pos),text_color=ok_col(macd3_pos), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 5, ok_symbol(macd4_pos),text_color=ok_col(macd4_pos), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 5, "MACD(12,26,9)",    text_color=C_NEUT,  bgcolor=C_BG_CELL, text_size=txt_boyut)
+
+    // ── Volatilite satırı ──
+    vol_regime_txt = sq_cur ? "SIKIŞ⚡" : bb_up_cur - bb_lo_cur > ta.sma(bb_up_cur - bb_lo_cur, 50) ? "GENİŞ" : "NORMAL"
+    vol_col_cell   = sq_cur ? C_WARN : C_NEUT
+    table.cell(tbl, 0, 6, "Volatilite",       text_color=C_TEXT,      bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 6, vol_regime_txt,     text_color=vol_col_cell, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 6, str.tostring(rel_vol_cur,"#.##") + "x", text_color=rel_vol_cur > 2 ? C_WARN : C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 6, "",                 text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 6, "",                 text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 6, "",                 text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 6, "BB+Keltner",      text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+
+    // ── Skor satırı ──
+    table.cell(tbl, 0, 7, "Skor /10",          text_color=C_TEXT,         bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 7, str.tostring(skor_cur,"#.#"), text_color=skor_col(skor_cur), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 7, str.tostring(skor1,"#.#"), text_color=skor_col(skor1), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 7, str.tostring(skor2,"#.#"), text_color=skor_col(skor2), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 7, str.tostring(skor3,"#.#"), text_color=skor_col(skor3), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 7, str.tostring(skor4,"#.#"), text_color=skor_col(skor4), bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 7, "Konfluens",        text_color=C_NEUT,         bgcolor=C_BG_CELL, text_size=txt_boyut)
+
+    // ── ATR / Hacim bilgisi satırı ──
+    atr_cur = ta.atr(14)
+    atr_txt = str.tostring(atr_cur, "#.##")
+    vol_txt = str.tostring(rel_vol_cur, "#.##") + "x"
+    table.cell(tbl, 0, 8, "ATR / Hacim",      text_color=C_TEXT,  bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 1, 8, "ATR:" + atr_txt,   text_color=C_NEUT,  bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 2, 8, vol_txt,             text_color=rel_vol_cur > 2 ? C_WARN : C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 3, 8, "",                  text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 4, 8, "",                  text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 5, 8, "",                  text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)
+    table.cell(tbl, 6, 8, "Pozisyon boyutu için ATR kullan", text_color=C_NEUT, bgcolor=C_BG_CELL, text_size=txt_boyut)

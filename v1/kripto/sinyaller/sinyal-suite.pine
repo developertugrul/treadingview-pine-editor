@@ -1,0 +1,207 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         KRİPTO SİNYAL PAKETİ — v6                           ║
+// ║  Mum Formasyonları · Konfluens Skoru · Dinamik Alertler      ║
+// ║  Kripto için uyarlanmış parametreler ve skor ağırlıkları     ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Kripto Sinyal Paketi", overlay=true, max_bars_back=500, max_labels_count=200)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00E676, 0) : color.new(#00701A, 0)
+C_BEAR   = is_dark ? color.new(#FF1744, 0) : color.new(#B71C1C, 0)
+C_NEUT   = is_dark ? color.new(#9E9E9E, 0) : color.new(#424242, 0)
+C_WARN   = is_dark ? color.new(#FFD740, 0) : color.new(#F57F17, 0)
+C_ACCENT = is_dark ? color.new(#40C4FF, 0) : color.new(#0277BD, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_mum = "── Mum Formasyonları ──"
+mum_on  = input.bool(true, "Mum Formasyonları Göster", group=grp_mum)
+mum_min = input.float(0.001, "Min Gövde Oranı", minval=0.0001, maxval=0.5, step=0.001, group=grp_mum)
+
+grp_kf = "── Konfluens Skoru ──"
+kf_min_al  = input.int(6,  "AL için Min Skor", minval=1, maxval=10, group=grp_kf)
+kf_min_sat = input.int(6,  "SAT için Min Skor",minval=1, maxval=10, group=grp_kf)
+kf_goster  = input.bool(true, "Skor Etiketi", group=grp_kf)
+
+grp_mtf = "── MTF Doğrulama ──"
+mtf_tf = input.timeframe("D", "MTF TF", group=grp_mtf)
+mtf_on = input.bool(true, "MTF Kullan", group=grp_mtf)
+
+grp_al = "── Alert ──"
+al_min_skor = input.int(7, "Alert Min Skor", minval=1, maxval=10, group=grp_al)
+webhook_on  = input.bool(true, "Webhook JSON Alert", group=grp_al)
+
+// ══════════════════════════════════════════════════════════════
+// MUM FORMASYONLARI (hisse ile aynı mantık)
+// ══════════════════════════════════════════════════════════════
+body     = math.abs(close - open)
+range_   = high - low
+wick_up  = high - math.max(close, open)
+wick_dn  = math.min(close, open) - low
+is_bull_bar = close > open
+is_bear_bar = close < open
+
+hammer       = is_bull_bar and wick_dn > body*2 and wick_up < body*0.5 and body > range_*mum_min
+hanging_man  = is_bear_bar and wick_dn > body*2 and wick_up < body*0.5 and body > range_*mum_min
+bull_engulf  = is_bear_bar[1] and is_bull_bar and close > open[1] and open < close[1] and body > body[1]*0.8
+bear_engulf  = is_bull_bar[1] and is_bear_bar and close < open[1] and open > close[1] and body > body[1]*0.8
+doji         = body < range_*0.1 and range_ > 0
+doji_dragon  = doji and wick_dn > range_*0.6 and wick_up < range_*0.2
+doji_grave   = doji and wick_up > range_*0.6 and wick_dn < range_*0.2
+pin_bar_bull = wick_dn > body*2.5 and wick_up < wick_dn*0.3
+pin_bar_bear = wick_up > body*2.5 and wick_dn < wick_up*0.3
+morning_star = is_bear_bar[2] and body[2] > range_[2]*0.4 and body[1] < range_[1]*0.3 and is_bull_bar and close > (open[2]+close[2])/2
+evening_star = is_bull_bar[2] and body[2] > range_[2]*0.4 and body[1] < range_[1]*0.3 and is_bear_bar and close < (open[2]+close[2])/2
+three_soldiers = is_bull_bar and is_bull_bar[1] and is_bull_bar[2] and close > close[1] and close[1] > close[2] and body > range_*0.5
+three_crows    = is_bear_bar and is_bear_bar[1] and is_bear_bar[2] and close < close[1] and close[1] < close[2] and body > range_*0.5
+
+bull_pattern = hammer or bull_engulf or doji_dragon or pin_bar_bull or morning_star or three_soldiers
+bear_pattern = hanging_man or bear_engulf or doji_grave or pin_bar_bear or evening_star or three_crows
+
+pattern_name = bull_engulf ? "Bull Engulfing" : bear_engulf ? "Bear Engulfing" :
+               hammer ? "Hammer" : hanging_man ? "Hanging Man" :
+               morning_star ? "Morning Star" : evening_star ? "Evening Star" :
+               three_soldiers ? "3 Soldiers" : three_crows ? "3 Crows" :
+               pin_bar_bull ? "Bull Pin" : pin_bar_bear ? "Bear Pin" :
+               doji_dragon ? "Dragonfly" : doji_grave ? "Gravestone" :
+               doji ? "Doji" : "—"
+
+// ══════════════════════════════════════════════════════════════
+// İNDİKATÖRLER
+// ══════════════════════════════════════════════════════════════
+ema50    = ta.ema(close, 50)
+ema200   = ta.ema(close, 200)
+[st_v, st_d] = ta.supertrend(3.5, 10)   // Kripto için 3.5
+rsi_v    = ta.rsi(close, 14)
+[_, _, macd_h] = ta.macd(close, 12, 26, 9)
+vol_avg  = ta.sma(volume, 20)
+rel_vol  = vol_avg > 0 ? volume / vol_avg : 1.0
+
+// BB Squeeze
+bb_up = ta.sma(close, 20) + 2.5 * ta.stdev(close, 20)   // Kripto: 2.5
+bb_lo = ta.sma(close, 20) - 2.5 * ta.stdev(close, 20)
+kc_up = ta.ema(close, 20) + 2.0 * ta.atr(20)             // Kripto: 2.0
+kc_lo = ta.ema(close, 20) - 2.0 * ta.atr(20)
+sq_bitti = not (bb_up < kc_up and bb_lo > kc_lo) and (bb_up[1] < kc_up[1] and bb_lo[1] > kc_lo[1])
+
+// MTF trend
+[mtf_e50, mtf_e200] = request.security(syminfo.tickerid, mtf_tf,
+    [ta.ema(close,50), ta.ema(close,200)], lookahead=barmerge.lookahead_off)
+mtf_yukari = mtf_on ? mtf_e50 > mtf_e200 : true
+
+// Pivot
+ph_lb = 14  // Kripto için biraz daha uzun
+ph = ta.pivothigh(high, ph_lb, ph_lb)
+pl = ta.pivotlow(low, ph_lb, ph_lb)
+var float last_res = na, var float last_sup = na
+if not na(ph) : last_res := ph
+if not na(pl) : last_sup := pl
+
+atr_val  = ta.atr(14)
+near_sup = not na(last_sup) and math.abs(close - last_sup) < atr_val * 0.7   // Kripto: daha geniş
+near_res = not na(last_res) and math.abs(close - last_res) < atr_val * 0.7
+
+// Stochastic RSI (kripto özel)
+rsi_lb     = ta.rsi(close, 14)
+rsi_l_min  = ta.lowest(rsi_lb, 14)
+rsi_l_max  = ta.highest(rsi_lb, 14)
+srsi_raw   = rsi_l_max - rsi_l_min > 0 ? (rsi_lb - rsi_l_min) / (rsi_l_max - rsi_l_min) * 100 : 50.0
+srsi_k     = ta.sma(srsi_raw, 3)
+srsi_os_signal = srsi_k <= 20 and ta.crossover(srsi_k, ta.sma(srsi_k, 3))
+
+// ══════════════════════════════════════════════════════════════
+// KONFLUENS SKORU — KRİPTO AĞIRLIKLARI
+// ══════════════════════════════════════════════════════════════
+al_skor  = 0
+al_skor += close > ema200    ? 1 : 0   // 1. Uzun vade trend
+al_skor += close > ema50     ? 1 : 0   // 2. Orta vade trend
+al_skor += st_d < 0          ? 1 : 0   // 3. SuperTrend yükseliş
+al_skor += rsi_v > 45 and rsi_v < 75 ? 1 : 0  // 4. RSI sağlıklı (kripto: 75)
+al_skor += macd_h > 0        ? 1 : 0   // 5. MACD pozitif
+al_skor += rel_vol >= 1.5    ? 1 : 0   // 6. Hacim (kripto: 1.5x)
+al_skor += sq_bitti          ? 1 : 0   // 7. Squeeze patlama
+al_skor += bull_pattern      ? 1 : 0   // 8. Boğa mum
+al_skor += mtf_yukari        ? 1 : 0   // 9. MTF uygun
+al_skor += near_sup or srsi_os_signal ? 1 : 0   // 10. Destek/StochRSI OS
+
+sat_skor  = 0
+sat_skor += close < ema200   ? 1 : 0
+sat_skor += close < ema50    ? 1 : 0
+sat_skor += st_d > 0         ? 1 : 0
+sat_skor += rsi_v > 70       ? 1 : 0
+sat_skor += macd_h < 0       ? 1 : 0
+sat_skor += rel_vol >= 1.5   ? 1 : 0
+sat_skor += sq_bitti         ? 1 : 0
+sat_skor += bear_pattern     ? 1 : 0
+sat_skor += not mtf_yukari   ? 1 : 0
+sat_skor += near_res         ? 1 : 0
+
+al_sinyali  = al_skor  >= kf_min_al  and barstate.isconfirmed
+sat_sinyali = sat_skor >= kf_min_sat and barstate.isconfirmed
+al_guclu    = al_skor  >= 8 and barstate.isconfirmed
+sat_guclu   = sat_skor >= 8 and barstate.isconfirmed
+
+// Breakout
+consol_tight = (ta.highest(high, 20) - ta.lowest(low, 20)) / close < 0.06  // Kripto: %6
+breakout_up  = consol_tight and close > ta.highest(high, 20)[1] and rel_vol > 2.0
+breakout_dn  = consol_tight and close < ta.lowest(low,  20)[1] and rel_vol > 2.0
+
+// ══════════════════════════════════════════════════════════════
+// PLOT
+// ══════════════════════════════════════════════════════════════
+plotshape(mum_on and hammer,       "Hammer",    shape.labelup,   location.belowbar, C_BULL, text="H",  size=size.tiny)
+plotshape(mum_on and bull_engulf,  "Bull Eng.", shape.labelup,   location.belowbar, C_BULL, text="E",  size=size.tiny)
+plotshape(mum_on and doji_dragon,  "Dragon",    shape.labelup,   location.belowbar, C_BULL, text="D",  size=size.tiny)
+plotshape(mum_on and morning_star, "Morn.Star", shape.labelup,   location.belowbar, C_BULL, text="MS", size=size.tiny)
+plotshape(mum_on and three_soldiers,"3S",       shape.labelup,   location.belowbar, C_BULL, text="3S", size=size.tiny)
+
+plotshape(mum_on and hanging_man,  "Hang.Man",  shape.labeldown, location.abovebar, C_BEAR, text="HM", size=size.tiny)
+plotshape(mum_on and bear_engulf,  "Bear Eng.", shape.labeldown, location.abovebar, C_BEAR, text="E",  size=size.tiny)
+plotshape(mum_on and doji_grave,   "Grave",     shape.labeldown, location.abovebar, C_BEAR, text="G",  size=size.tiny)
+plotshape(mum_on and evening_star, "Even.Star", shape.labeldown, location.abovebar, C_BEAR, text="ES", size=size.tiny)
+plotshape(mum_on and three_crows,  "3C",        shape.labeldown, location.abovebar, C_BEAR, text="3C", size=size.tiny)
+
+plotshape(al_sinyali  and not al_guclu,  "AL",       shape.triangleup,   location.belowbar, color.new(C_BULL,20), size=size.small)
+plotshape(sat_sinyali and not sat_guclu, "SAT",      shape.triangledown, location.abovebar, color.new(C_BEAR,20), size=size.small)
+plotshape(al_guclu,  "GÜÇLÜ AL",  shape.triangleup,   location.belowbar, C_BULL, size=size.large)
+plotshape(sat_guclu, "GÜÇLÜ SAT", shape.triangledown, location.abovebar, C_BEAR, size=size.large)
+
+plotshape(breakout_up, "Breakout ↑", shape.arrowup,   location.abovebar, C_BULL, size=size.small)
+plotshape(breakout_dn, "Breakout ↓", shape.arrowdown, location.belowbar, C_BEAR, size=size.small)
+
+if barstate.isconfirmed and kf_goster and (al_sinyali or sat_sinyali)
+    sd = al_sinyali ? al_skor : sat_skor
+    sy = al_sinyali ? "AL" : "SAT"
+    sc = al_sinyali ? C_BULL : C_BEAR
+    sp = al_sinyali ? low - atr_val*0.3 : high + atr_val*0.3
+    ss = al_sinyali ? label.style_label_up : label.style_label_down
+    label.new(bar_index, sp, sy + " " + str.tostring(sd) + "/10\n" + pattern_name,
+              color=color.new(sc,70), textcolor=sc, style=ss, size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(al_sinyali,  "Kripto AL",      "🟢 KRİPTO AL | {{ticker}} | Skor: " + str.tostring(al_skor) + "/10 @ {{close}}")
+alertcondition(sat_sinyali, "Kripto SAT",     "🔴 KRİPTO SAT | {{ticker}} | Skor: " + str.tostring(sat_skor) + "/10 @ {{close}}")
+alertcondition(al_guclu,    "Güçlü AL",       "🚀 GÜÇLÜ AL (8+) | {{ticker}} @ {{close}}")
+alertcondition(breakout_up, "Breakout ↑",     "🚀 KRİPTO BREAKOUT ↑ | {{ticker}} @ {{close}}")
+alertcondition(breakout_dn, "Breakout ↓",     "💥 KRİPTO BREAKOUT ↓ | {{ticker}} @ {{close}}")
+
+if barstate.isconfirmed
+    if al_skor >= al_min_skor
+        if webhook_on
+            alert('{"event":"KRIPTO_AL","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"skor":' + str.tostring(al_skor) + ',"formasyon":"' + pattern_name + '","tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+        else
+            alert("🟢 KRİPTO AL: " + syminfo.ticker + " | Skor: " + str.tostring(al_skor) + "/10 | " + str.tostring(close,"#.##"), alert.freq_once_per_bar_close)
+    if sat_skor >= al_min_skor
+        if webhook_on
+            alert('{"event":"KRIPTO_SAT","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"skor":' + str.tostring(sat_skor) + ',"formasyon":"' + pattern_name + '","tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
+        else
+            alert("🔴 KRİPTO SAT: " + syminfo.ticker + " | Skor: " + str.tostring(sat_skor) + "/10 | " + str.tostring(close,"#.##"), alert.freq_once_per_bar_close)

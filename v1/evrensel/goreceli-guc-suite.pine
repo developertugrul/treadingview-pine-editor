@@ -1,0 +1,197 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║        GÖRECELİ GÜÇ PAKETİ — v6                            ║
+// ║  Hisse vs Endeks · RS Trend · Sektör Karşılaştırma          ║
+// ║  ► ÖNCE HISSE SENEDI İÇİN TASARLANDI (BIST/Global)          ║
+// ║  ► Kripto ve Emtia için de kullanılabilir (benchmark değiştir)║
+// ╚══════════════════════════════════════════════════════════════╝
+// NASIL KULLANILIR:
+// RS > 0 ve yükseliyorsa → Hisse endeksten GÜÇLÜ → AL tarafı
+// RS < 0 ve düşüyorsa  → Hisse endeksten ZAYIF  → KAÇIN
+// Endeks düşerken RS yüksekse → Savunmacı güç (çok bullish!)
+// Endeks yükselirken RS düşükse → Zayıf rally (satış baskısı altında)
+indicator("Göreceli Güç Paketi", overlay=false, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_rs = "── Göreceli Güç Ayarları ──"
+// BIST hisseleri için → BIST:XU100, BIST:XU030
+// Global hisseler için → SP:SPX, NASDAQ:NDX
+// Kripto için → CRYPTOCAP:BTC.D veya INDEX:BTCUSD
+// Emtia için → TVC:DXY veya XAUUSD
+benchmark = input.symbol("BIST:XU100", "Referans (Benchmark) Sembolü", group=grp_rs)
+rs_per    = input.int(20,  "RS Hesaplama Periyodu",    minval=5, maxval=100, group=grp_rs)
+smooth_per = input.int(5,  "RS Düzgünleştirme (EMA)", minval=1, maxval=30,  group=grp_rs)
+
+grp_cf = "── Karşılaştırmalı Performans ──"
+perf_lb   = input.int(20, "Performans Lookback (bar)", minval=5, maxval=200, group=grp_cf)
+perf_show = input.bool(true, "Performans Tablo Göster",               group=grp_cf)
+
+grp_alert = "── Alert ──"
+rs_alert_up  = input.float(5.0,  "RS+ Eşiği (RS alert)",  minval=0.5, group=grp_alert)
+rs_alert_dn  = input.float(-5.0, "RS- Eşiği (RS alert)",  maxval=-0.5, group=grp_alert)
+
+// ══════════════════════════════════════════════════════════════
+// VERİ ÇEK
+// ══════════════════════════════════════════════════════════════
+bench_close = request.security(benchmark, timeframe.period, close,
+              lookahead=barmerge.lookahead_off)
+
+// ══════════════════════════════════════════════════════════════
+// GÖRECELİ GÜÇ HESAPLAMALARI
+// ══════════════════════════════════════════════════════════════
+// RS Ratio = (Hisse / Benchmark) normalize
+rs_raw = bench_close > 0 ? close / bench_close : na
+
+// RS Change = RS oranının yüzde değişimi (rs_per barda)
+rs_change = not na(rs_raw) and not na(rs_raw[rs_per]) and rs_raw[rs_per] > 0 ?
+            (rs_raw - rs_raw[rs_per]) / rs_raw[rs_per] * 100 : 0.0
+
+// RS düzgünleştirme
+rs_ema   = ta.ema(rs_change, smooth_per)
+rs_trend = rs_ema > rs_ema[3]   // RS yükseliyor mu?
+
+// RS seviyeleri
+rs_avg  = ta.sma(rs_change, 50)
+rs_std  = ta.stdev(rs_change, 50)
+rs_strong_bull = rs_change > rs_avg + rs_std       // Tarihsel güçlü bölge
+rs_strong_bear = rs_change < rs_avg - rs_std       // Tarihsel zayıf bölge
+
+// ══════════════════════════════════════════════════════════════
+// PERFORMANS KARŞILAŞTIRMASI
+// ══════════════════════════════════════════════════════════════
+// Son N barda kaç % kazandı/kaybetti?
+hisse_perf  = not na(close[perf_lb]) and close[perf_lb] > 0 ?
+              (close - close[perf_lb]) / close[perf_lb] * 100 : 0.0
+bench_perf  = not na(bench_close[perf_lb]) and bench_close[perf_lb] > 0 ?
+              (bench_close - bench_close[perf_lb]) / bench_close[perf_lb] * 100 : 0.0
+fark        = hisse_perf - bench_perf
+
+// Outperform / Underperform
+outperform = fark > 0
+alfa        = fark  // Fazla getiri (alfa)
+
+// ══════════════════════════════════════════════════════════════
+// SİNYALLER
+// ══════════════════════════════════════════════════════════════
+rs_cross_up   = ta.crossover(rs_change,  0)    // RS sıfırın üstüne geçti
+rs_cross_down = ta.crossunder(rs_change, 0)    // RS sıfırın altına geçti
+rs_güçlendi   = rs_trend and not rs_trend[1]    // RS yukarı döndü
+rs_zayıfladı  = not rs_trend and rs_trend[1]    // RS aşağı döndü
+
+// En güçlü kombinasyon: Endeks düşerken RS yüksek
+bench_dusus = bench_close < bench_close[5]
+savunmaci_guc = rs_change > 2.0 and bench_dusus   // Piyasa düşerken güçlü kalıyor
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — RS Çizgisi
+// ══════════════════════════════════════════════════════════════
+rs_col = rs_change > 0 ? C_BULL : C_BEAR
+plot(rs_change, "RS Değişimi (%)",   color=rs_col, linewidth=2)
+plot(rs_ema,    "RS EMA (Düzgün)", color=color.new(C_WARN, 20), linewidth=1)
+
+// Sıfır çizgisi
+plot(0, "Sıfır", color=color.new(C_NEUT, 50), linewidth=1, style=plot.style_line)
+
+// RS ortalama ve std bölgeleri
+rs_ob_plot = plot(rs_avg + rs_std, "RS OB Bölgesi", color=color.new(C_BEAR, 70), linewidth=1, style=plot.style_dashed)
+rs_os_plot = plot(rs_avg - rs_std, "RS OS Bölgesi", color=color.new(C_BULL, 70), linewidth=1, style=plot.style_dashed)
+            plot(rs_avg,           "RS Ortalama",   color=color.new(C_NEUT, 60), linewidth=1, style=plot.style_dashed)
+
+fill(rs_ob_plot, plot(rs_avg + rs_std * 2, display=display.none), color=color.new(C_BEAR, 93))
+fill(rs_os_plot, plot(rs_avg - rs_std * 2, display=display.none), color=color.new(C_BULL, 93))
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — Sinyaller
+// ══════════════════════════════════════════════════════════════
+plotshape(rs_cross_up,   "RS + Geçiş", shape.triangleup,   location.bottom, C_BULL,   size=size.small)
+plotshape(rs_cross_down, "RS - Geçiş", shape.triangledown, location.top,    C_BEAR,   size=size.small)
+plotshape(savunmaci_guc, "Savunmacı Güç ⭐", shape.star, location.top, C_WARN, size=size.small)
+
+// Histogram dolgusu
+p_rs = plot(rs_change, display=display.none)
+p_zero = plot(0, display=display.none)
+fill(p_rs, p_zero, color=rs_change > 0 ? color.new(C_BULL, 88) : color.new(C_BEAR, 88))
+
+// ══════════════════════════════════════════════════════════════
+// PERFORMANS TABLOSU
+// ══════════════════════════════════════════════════════════════
+var table tbl = table.new(position.top_right, 3, 7,
+                           border_width=1,
+                           border_color=is_dark ? color.new(#444444,0) : color.new(#CCCCCC,0),
+                           frame_width=1)
+
+if barstate.islast and perf_show
+    ts = size.small
+    bg = is_dark ? color.new(#1A1A1A, 85) : color.new(#FAFAFA, 85)
+    tc = is_dark ? color.new(#FFFFFF, 0)  : color.new(#000000, 0)
+
+    hc = outperform ? color.new(C_BULL, 65) : color.new(C_BEAR, 65)
+    table.cell(tbl, 0, 0, "📊 Göreceli Güç", text_color=tc, bgcolor=hc, text_size=ts)
+    table.cell(tbl, 1, 0, syminfo.ticker,    text_color=tc, bgcolor=hc, text_size=ts)
+    table.cell(tbl, 2, 0, "vs " + benchmark, text_color=tc, bgcolor=hc, text_size=ts)
+
+    // Son N bar performans
+    table.cell(tbl, 0, 1, "Hisse Perf.",   text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 1, str.tostring(hisse_perf, "+#.##") + "%",
+               text_color=hisse_perf >= 0 ? C_BULL : C_BEAR, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 2, 1, str.tostring(perf_lb) + " bar", text_color=C_NEUT, bgcolor=bg, text_size=ts)
+
+    table.cell(tbl, 0, 2, "Endeks Perf.",  text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 2, str.tostring(bench_perf, "+#.##") + "%",
+               text_color=bench_perf >= 0 ? C_BULL : C_BEAR, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 2, 2, benchmark, text_color=C_NEUT, bgcolor=bg, text_size=ts)
+
+    // Alfa (fazla getiri)
+    alfa_c = fark > 0 ? C_BULL : C_BEAR
+    table.cell(tbl, 0, 3, "Alfa (Fark)",   text_color=tc,    bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 3, str.tostring(fark, "+#.##") + "%", text_color=alfa_c, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 2, 3, outperform ? "⬆ OUTPERFORM" : "⬇ UNDERPERFORM",
+               text_color=alfa_c, bgcolor=bg, text_size=ts)
+
+    // RS şu anki durum
+    rs_c = rs_change > 0 ? C_BULL : C_BEAR
+    table.cell(tbl, 0, 4, "RS (" + str.tostring(rs_per) + "p)",  text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 4, str.tostring(rs_change, "+#.##") + "%", text_color=rs_c, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 2, 4, rs_trend ? "↑ RS Güçleniyor" : "↓ RS Zayıflıyor",
+               text_color=rs_trend ? C_BULL : C_BEAR, bgcolor=bg, text_size=ts)
+
+    // Savunmacı güç
+    table.cell(tbl, 0, 5, "Savunmacı",    text_color=tc, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 5, savunmaci_guc ? "⭐ GÜÇLÜ" : "—", text_color=savunmaci_guc ? C_WARN : C_NEUT, bgcolor=bg, text_size=ts)
+    table.cell(tbl, 2, 5, "Piyasa ↓ ama hisse güçlü", text_color=C_NEUT, bgcolor=bg, text_size=ts)
+
+    // RS sinyali
+    rs_sig_txt = rs_strong_bull ? "RS GÜÇLÜ BÖLGE" : rs_strong_bear ? "RS ZAYIF BÖLGE" : rs_change > 0 ? "RS Pozitif" : "RS Negatif"
+    rs_sig_c   = rs_strong_bull ? C_BULL : rs_strong_bear ? C_BEAR : C_NEUT
+    table.cell(tbl, 0, 6, "RS Bölge",     text_color=tc,      bgcolor=bg, text_size=ts)
+    table.cell(tbl, 1, 6, rs_sig_txt,     text_color=rs_sig_c,bgcolor=bg, text_size=ts)
+    table.cell(tbl, 2, 6, "1σ üstü/altı", text_color=C_NEUT,  bgcolor=bg, text_size=ts)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(rs_cross_up,   "RS Pozitife Geçti",  "🟢 Göreceli Güç Pozitif | {{ticker}} vs Endeks")
+alertcondition(rs_cross_down, "RS Negatife Geçti",  "🔴 Göreceli Güç Negatif | {{ticker}} vs Endeks")
+alertcondition(savunmaci_guc, "Savunmacı Güç",      "⭐ Savunmacı Güç: {{ticker}} piyasa düşerken güçlü!")
+alertcondition(rs_strong_bull,"RS Güçlü Bölge",     "🟢 RS Güçlü Bölgede | {{ticker}}")
+alertcondition(outperform and rs_güçlendi, "Outperform + RS Güçlendi", "🚀 Outperform + RS Güçleniyor | {{ticker}}")
+
+if barstate.isconfirmed
+    if savunmaci_guc
+        alert('{"event":"SAVUNMACI_GUC","ticker":"' + syminfo.ticker + '","rs":' + str.tostring(rs_change,"#.##") + ',"bench_dusus":true}', alert.freq_once_per_bar_close)
+    if rs_cross_up
+        alert('{"event":"RS_POZITIF","ticker":"' + syminfo.ticker + '","rs":' + str.tostring(rs_change,"#.##") + ',"benchmark":"' + benchmark + '"}', alert.freq_once_per_bar_close)

@@ -1,0 +1,196 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║        RİSK / ÖDÜL HESAPLAYICI — v6                         ║
+// ║  Stop-Loss · Take-Profit · Pozisyon Boyutu · R:R Oranı       ║
+// ║  ► TÜM VARLIK SINIFLARI İÇİN (EVRENSEL)                     ║
+// ║  ► Her trade'den ÖNCE bu dosyayı aç ve planla               ║
+// ╚══════════════════════════════════════════════════════════════╝
+// NASIL KULLANILIR:
+// 1. Giriş fiyatı = Almayı planladığın fiyat
+// 2. SL = Stop-loss seviyesi (yanlışlandığın nokta)
+// 3. Portföy ve Risk % gir
+// 4. Dosya otomatik hesaplar: Lot, TP1/TP2/TP3, R:R
+// NOT: Fiyat girerken TradingView'daki fiyatı kullan
+indicator("Risk / Ödül Hesaplayıcı", overlay=true, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+C_BG     = is_dark ? color.new(#1A1A1A, 85) : color.new(#FAFAFA, 85)
+C_TEXT   = is_dark ? color.new(#FFFFFF, 0)  : color.new(#000000, 0)
+C_BORDER = is_dark ? color.new(#444444, 0)  : color.new(#CCCCCC, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS — GİRİŞ BİLGİLERİ
+// ══════════════════════════════════════════════════════════════
+grp_trade = "── Trade Parametreleri ──"
+yon        = input.string("LONG",   "Yön",           options=["LONG","SHORT"],         group=grp_trade)
+giris      = input.float(0.0,       "Giriş Fiyatı",  minval=0, step=0.01,               group=grp_trade)
+sl         = input.float(0.0,       "Stop-Loss",     minval=0, step=0.01,               group=grp_trade)
+// 0 girilirse ATR bazlı otomatik SL
+
+grp_portfoy = "── Portföy ve Risk ──"
+portfoy_tl  = input.float(100000.0, "Portföy (TL/USD vb.)", minval=1,                 group=grp_portfoy)
+risk_pct    = input.float(1.0,      "Risk Yüzdesi (%)",  minval=0.1, maxval=10, step=0.1, group=grp_portfoy)
+
+grp_tp = "── Take-Profit Seviyeleri ──"
+tp1_rr  = input.float(1.0,  "TP1 Risk:Ödül Oranı", minval=0.5, step=0.5, group=grp_tp)
+tp2_rr  = input.float(2.0,  "TP2 Risk:Ödül Oranı", minval=1.0, step=0.5, group=grp_tp)
+tp3_rr  = input.float(3.0,  "TP3 Risk:Ödül Oranı", minval=1.5, step=0.5, group=grp_tp)
+
+grp_goster = "── Gösterim ──"
+giris_cizgi = input.bool(true,  "Giriş/SL/TP çizgileri göster", group=grp_goster)
+panel_on    = input.bool(true,  "Hesap tablosunu göster",         group=grp_goster)
+atr_sl_on   = input.bool(false, "SL=0 ise ATR bazlı otomatik kullan", group=grp_goster)
+atr_mult    = input.float(2.0,  "ATR SL Çarpanı",  minval=0.5, maxval=5.0, step=0.1,  group=grp_goster)
+
+// ══════════════════════════════════════════════════════════════
+// HESAPLAMALAR
+// ══════════════════════════════════════════════════════════════
+atr_v = ta.atr(14)
+
+// Aktif giriş fiyatı — giris=0 ise mevcut fiyatı kullan
+aktif_giris = giris > 0 ? giris : close
+
+// Aktif SL — sl=0 ise ATR bazlı veya mevcut fiyat
+aktif_sl = sl > 0 ? sl :
+           atr_sl_on ? (yon == "LONG" ? aktif_giris - atr_v * atr_mult : aktif_giris + atr_v * atr_mult) :
+           na
+
+// SL mesafesi (pozitif)
+sl_mesafe = not na(aktif_sl) ? math.abs(aktif_giris - aktif_sl) : 0.0
+sl_pct    = aktif_giris > 0 ? sl_mesafe / aktif_giris * 100 : 0.0
+
+// Take-Profit seviyeleri
+tp1 = yon == "LONG" ? aktif_giris + sl_mesafe * tp1_rr : aktif_giris - sl_mesafe * tp1_rr
+tp2 = yon == "LONG" ? aktif_giris + sl_mesafe * tp2_rr : aktif_giris - sl_mesafe * tp2_rr
+tp3 = yon == "LONG" ? aktif_giris + sl_mesafe * tp3_rr : aktif_giris - sl_mesafe * tp3_rr
+
+// Maks kayıp (TL/USD)
+maks_kayip = portfoy_tl * risk_pct / 100
+
+// Pozisyon büyüklüğü (lot/hisse)
+pozisyon_boyutu = sl_mesafe > 0 ? maks_kayip / sl_mesafe : 0.0
+
+// Pozisyon değeri
+pozisyon_deger = pozisyon_boyutu * aktif_giris
+
+// Portföy yüzdesi
+pozisyon_pct = portfoy_tl > 0 ? pozisyon_deger / portfoy_tl * 100 : 0.0
+
+// Beklenen kar/zarar
+beklenen_kar1 = pozisyon_boyutu * sl_mesafe * tp1_rr
+beklenen_kar2 = pozisyon_boyutu * sl_mesafe * tp2_rr
+beklenen_kar3 = pozisyon_boyutu * sl_mesafe * tp3_rr
+
+// R:R kontrol
+rr_ok = tp2_rr >= 2.0  // Minimum 1:2 kuralı
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — GİRİŞ / SL / TP ÇİZGİLERİ
+// ══════════════════════════════════════════════════════════════
+// Giriş çizgisi
+plot(giris_cizgi and aktif_giris > 0 ? aktif_giris : na, "Giriş",
+     color=color.new(C_ACCENT, 0), linewidth=2, style=plot.style_line)
+
+// SL çizgisi
+plot(giris_cizgi and not na(aktif_sl) ? aktif_sl : na, "Stop-Loss",
+     color=color.new(C_BEAR, 0), linewidth=2, style=plot.style_line)
+
+// TP çizgileri
+plot(giris_cizgi and not na(aktif_sl) and sl_mesafe > 0 ? tp1 : na, "TP1 (1:1)",
+     color=color.new(C_BULL, 60), linewidth=1, style=plot.style_dashed)
+plot(giris_cizgi and not na(aktif_sl) and sl_mesafe > 0 ? tp2 : na, "TP2 (1:2)",
+     color=color.new(C_BULL, 30), linewidth=2, style=plot.style_dashed)
+plot(giris_cizgi and not na(aktif_sl) and sl_mesafe > 0 ? tp3 : na, "TP3 (1:3)",
+     color=color.new(C_BULL, 0),  linewidth=2, style=plot.style_dashed)
+
+// Giriş-SL arasını kırmızı, Giriş-TP2 arasını yeşil doldur
+p_giris = plot(giris_cizgi ? aktif_giris : na, display=display.none)
+p_sl    = plot(giris_cizgi and not na(aktif_sl) ? aktif_sl : na, display=display.none)
+p_tp2   = plot(giris_cizgi and sl_mesafe > 0 ? tp2 : na, display=display.none)
+fill(p_giris, p_sl,   color=color.new(C_BEAR, 88), title="Risk Bölgesi")
+fill(p_giris, p_tp2,  color=color.new(C_BULL, 92), title="Ödül Bölgesi")
+
+// ══════════════════════════════════════════════════════════════
+// HESAP TABLOSU
+// ══════════════════════════════════════════════════════════════
+var table tbl = table.new(position.top_right, 3, 12,
+                           border_width=1, border_color=C_BORDER,
+                           frame_color=C_BORDER, frame_width=1)
+
+if barstate.islast and panel_on
+    txt_s = size.small
+
+    // Başlık
+    hdr = rr_ok ? color.new(C_BULL, 60) : color.new(C_WARN, 60)
+    rr_txt = rr_ok ? "✓ R:R ≥ 1:2" : "⚠ R:R < 1:2"
+    table.cell(tbl, 0, 0, "💰 RİSK / ÖDÜL",     text_color=C_TEXT, bgcolor=hdr, text_size=txt_s)
+    table.cell(tbl, 1, 0, rr_txt,                text_color=C_TEXT, bgcolor=hdr, text_size=txt_s)
+    table.cell(tbl, 2, 0, yon,                   text_color=yon=="LONG"?C_BULL:C_BEAR, bgcolor=hdr, text_size=txt_s)
+
+    // Fiyatlar
+    table.cell(tbl, 0, 1, "Giriş",  text_color=C_TEXT,   bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 1, str.tostring(aktif_giris,"#.####"), text_color=C_ACCENT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 1, "Mevcut: "+str.tostring(close,"#.####"), text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+
+    table.cell(tbl, 0, 2, "Stop-Loss", text_color=C_TEXT, bgcolor=C_BG, text_size=txt_s)
+    sl_txt = not na(aktif_sl) ? str.tostring(aktif_sl,"#.####") : "YOK (SL gir!)"
+    sl_c   = not na(aktif_sl) ? C_BEAR : C_WARN
+    table.cell(tbl, 1, 2, sl_txt, text_color=sl_c, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 2, "Mesafe: " + str.tostring(sl_pct,"#.##") + "%", text_color=C_BEAR, bgcolor=C_BG, text_size=txt_s)
+
+    table.cell(tbl, 0, 3, "TP1 (1:"+str.tostring(tp1_rr,"#.#")+")", text_color=C_TEXT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 3, str.tostring(tp1,"#.####"), text_color=color.new(C_BULL,40), bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 3, "+" + str.tostring(beklenen_kar1,"#.##"), text_color=color.new(C_BULL,40), bgcolor=C_BG, text_size=txt_s)
+
+    table.cell(tbl, 0, 4, "TP2 (1:"+str.tostring(tp2_rr,"#.#")+")", text_color=C_TEXT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 4, str.tostring(tp2,"#.####"), text_color=C_BULL, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 4, "+" + str.tostring(beklenen_kar2,"#.##"), text_color=C_BULL, bgcolor=C_BG, text_size=txt_s)
+
+    table.cell(tbl, 0, 5, "TP3 (1:"+str.tostring(tp3_rr,"#.#")+")", text_color=C_TEXT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 5, str.tostring(tp3,"#.####"), text_color=color.new(C_BULL,20), bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 5, "+" + str.tostring(beklenen_kar3,"#.##"), text_color=color.new(C_BULL,20), bgcolor=C_BG, text_size=txt_s)
+
+    // Ayırıcı
+    table.cell(tbl, 0, 6, "────────",  text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 6, "────────",  text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 6, "────────",  text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+
+    // Portföy ve pozisyon
+    table.cell(tbl, 0, 7, "Portföy",   text_color=C_TEXT,  bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 7, str.tostring(portfoy_tl,"#,###"), text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 7, "Maks Risk: " + str.tostring(risk_pct,"#.#") + "%", text_color=C_WARN, bgcolor=C_BG, text_size=txt_s)
+
+    table.cell(tbl, 0, 8, "Maks Kayıp", text_color=C_TEXT,  bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 8, str.tostring(maks_kayip,"#,###.##"), text_color=C_BEAR, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 8, "(%"+str.tostring(risk_pct,"#.#")+" portföy)", text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+
+    // Pozisyon boyutu
+    pb_c = pozisyon_pct > 30 ? C_WARN : C_NEUT
+    table.cell(tbl, 0, 9, "Pozisyon",  text_color=C_TEXT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 9, str.tostring(pozisyon_boyutu,"#.####") + " birim", text_color=C_ACCENT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 9, str.tostring(pozisyon_pct,"#.#") + "% portföy", text_color=pb_c, bgcolor=C_BG, text_size=txt_s)
+
+    // ATR bilgisi
+    table.cell(tbl, 0, 10, "ATR(14)",   text_color=C_TEXT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 1, 10, str.tostring(atr_v,"#.####"), text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+    table.cell(tbl, 2, 10, "Öneri SL: " + str.tostring(atr_v*atr_mult,"#.####"), text_color=C_NEUT, bgcolor=C_BG, text_size=txt_s)
+
+    // Uyarı veya onay
+    if not rr_ok
+        table.cell(tbl, 0, 11, "⚠️ UYARI",   text_color=C_WARN, bgcolor=color.new(C_WARN,88), text_size=txt_s)
+        table.cell(tbl, 1, 11, "R:R < 1:2",  text_color=C_WARN, bgcolor=color.new(C_WARN,88), text_size=txt_s)
+        table.cell(tbl, 2, 11, "GİRME!",     text_color=C_WARN, bgcolor=color.new(C_WARN,88), text_size=txt_s)
+    else
+        table.cell(tbl, 0, 11, "✓ ONAY",     text_color=C_BULL, bgcolor=color.new(C_BULL,88), text_size=txt_s)
+        table.cell(tbl, 1, 11, "R:R ≥ 1:2",  text_color=C_BULL, bgcolor=color.new(C_BULL,88), text_size=txt_s)
+        table.cell(tbl, 2, 11, "GEÇERLİ",   text_color=C_BULL, bgcolor=color.new(C_BULL,88), text_size=txt_s)

@@ -1,0 +1,26 @@
+study("Hareketli Ortalama COMBO", overlay=true, shorttitle="üssel ortalamalar")
+src = input(title="Source", type=source, defval=close)
+
+length1 = input(5, "EMA")
+plot(ema(src, length1), color=black, linewidth=2, title="MOV1")
+
+length2 = input(9, "EMA")
+plot(ema(src, length2), color=purple, linewidth=2, title="MOV2")
+
+length3 = input(21, "EMA")
+plot(ema(src, length3), color=red, linewidth=2, title="MOV3")
+
+length4 = input(50, "EMA")
+plot(ema(src, length4), color=green, linewidth=2, title="MOV4")
+
+length5 = input(100, "EMA")
+plot(ema(src, length5), color=orange, linewidth=2, title="MOV5")
+
+length6 = input(200, "EMA")
+plot(ema(src, length6), color=blue, linewidth=2, title="MOV6")
+
+length7 = input(377, "EMA")
+plot(ema(src, length7), color=purple, linewidth=2, title="MOV7")
+
+length8 = input(610, "EMA")
+plot(ema(src, length8), color=green, linewidth=2, title="MOV8")

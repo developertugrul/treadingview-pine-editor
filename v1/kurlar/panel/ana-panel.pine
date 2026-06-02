@@ -1,0 +1,171 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         KURLAR ANA PANELİ — v6                              ║
+// ║  Forex Multi-Timeframe Dashboard · Seans · Pivot · MTF       ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Kurlar Ana Panel", overlay=true, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_BG     = is_dark ? color.new(#1A2535, 85) : color.new(#F0F4FA, 85)  // Forex tema: lacivert
+C_TEXT   = is_dark ? color.new(#E0E0E0, 0)  : color.new(#111111, 0)
+C_BORDER = is_dark ? color.new(#2A3545, 0)  : color.new(#AABBCC, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+panel_konum = input.string("Sağ Üst", "Konum", options=["Sağ Üst","Sağ Alt","Sol Üst","Sol Alt"])
+panel_boyut = input.string("Normal",  "Boyut", options=["Küçük","Normal","Büyük"])
+mtf1 = input.timeframe("15",  "TF 1")
+mtf2 = input.timeframe("60",  "TF 2")
+mtf3 = input.timeframe("240", "TF 3")
+mtf4 = input.timeframe("D",   "TF 4")
+
+// ══════════════════════════════════════════════════════════════
+// HESAPLAMALAR
+// ══════════════════════════════════════════════════════════════
+ema50_c  = ta.ema(close, 50)
+ema200_c = ta.ema(close, 200)
+[st_c,st_dc] = ta.supertrend(3.0,14)
+rsi_c    = ta.rsi(close, 14)
+[_,_,macd_hc] = ta.macd(close, 12, 26, 9)
+stoch_c  = ta.sma(ta.stoch(close,high,low,14), 3)
+atr_c    = ta.atr(14)
+
+// Daily Pivot
+prev_h = request.security(syminfo.tickerid,"D",high[1],  lookahead=barmerge.lookahead_off)
+prev_l = request.security(syminfo.tickerid,"D",low[1],   lookahead=barmerge.lookahead_off)
+prev_c_d = request.security(syminfo.tickerid,"D",close[1],lookahead=barmerge.lookahead_off)
+pp  = (prev_h + prev_l + prev_c_d) / 3
+r1c = 2*pp - prev_l
+s1c = 2*pp - prev_h
+
+// Seans
+cur_h = hour(time,"UTC")
+aktif_seans = cur_h >= 7 and cur_h < 21
+seans_txt = cur_h >= 12 and cur_h < 16 ? "LD/NY OVERLAP🔥" :
+            cur_h >= 7  and cur_h < 9  ? "TK/LD Overlap🔶" :
+            cur_h >= 7  and cur_h < 16 ? "Londra🟡" :
+            cur_h >= 12 and cur_h < 21 ? "New York🔴" :
+            cur_h >= 0  and cur_h < 9  ? "Tokyo🔵" : "Kapalı💤"
+
+// MTF fonksiyon
+f_skor(tf) =>
+    _e50  = request.security(syminfo.tickerid, tf, ta.ema(close,50),  lookahead=barmerge.lookahead_off)
+    _e200 = request.security(syminfo.tickerid, tf, ta.ema(close,200), lookahead=barmerge.lookahead_off)
+    _rsi  = request.security(syminfo.tickerid, tf, ta.rsi(close,14),  lookahead=barmerge.lookahead_off)
+    [_,_,_hist] = request.security(syminfo.tickerid, tf, ta.macd(close,12,26,9), lookahead=barmerge.lookahead_off)
+    [_st,_stdir] = request.security(syminfo.tickerid, tf, ta.supertrend(3.0,14), lookahead=barmerge.lookahead_off)
+    _cl = request.security(syminfo.tickerid, tf, close, lookahead=barmerge.lookahead_off)
+    _sc = (_cl>_e50?2:-2) + (_cl>_e200?2:-2) + (_stdir<0?2:-2) + (_rsi>50?1:-1) + (_hist>0?1:-1)
+    [_rsi, _hist>0, _stdir<0, _cl>_e200, math.max(0.0, math.min(10.0, (_sc+8.0)/1.6))]
+
+[r1,m1,s1u,t1,k1] = f_skor(mtf1)
+[r2,m2,s2u,t2,k2] = f_skor(mtf2)
+[r3,m3,s3u,t3,k3] = f_skor(mtf3)
+[r4,m4,s4u,t4,k4] = f_skor(mtf4)
+
+// ══════════════════════════════════════════════════════════════
+// YARDIMCILAR
+// ══════════════════════════════════════════════════════════════
+ok_s(b) => b ? "↑" : "↓"
+ok_c(b) => b ? C_BULL : C_BEAR
+rc(r)   => r >= 70 ? C_BEAR : r <= 30 ? C_BULL : r >= 55 ? color.new(C_BULL,40) : r <= 45 ? color.new(C_BEAR,40) : C_NEUT
+sc(s)   => s >= 7 ? C_BULL : s <= 3 ? C_BEAR : C_WARN
+
+tbl_pos = panel_konum == "Sağ Üst" ? position.top_right : panel_konum == "Sağ Alt" ? position.bottom_right :
+          panel_konum == "Sol Üst" ? position.top_left  : position.bottom_left
+ts = panel_boyut == "Küçük" ? size.tiny : panel_boyut == "Büyük" ? size.normal : size.small
+
+var table tbl = table.new(tbl_pos, 7, 9, border_width=1, border_color=C_BORDER, frame_color=C_BORDER, frame_width=1)
+
+if barstate.islast
+    hc = color.new(C_ACCENT, 65)
+    table.cell(tbl,0,0,"💱 " + syminfo.ticker, text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,1,0,"Anlık",  text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,2,0,mtf1,     text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,3,0,mtf2,     text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,4,0,mtf3,     text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,5,0,mtf4,     text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,6,0,"Ref.",   text_color=C_TEXT, bgcolor=hc, text_size=ts)
+
+    dg = (close-close[1])/close[1]*100
+    dc = dg >= 0 ? C_BULL : C_BEAR
+    table.cell(tbl,0,1,"Fiyat",    text_color=C_TEXT, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,1,str.tostring(close,"#.#####"), text_color=dc, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,2,1,str.tostring(dg,"+#.##")+"%",  text_color=dc, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,3,1,seans_txt,  text_color=aktif_seans?C_BULL:C_NEUT, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,4,1,"",         text_color=C_NEUT, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,5,1,"",         text_color=C_NEUT, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,1,"Pip:"+str.tostring(syminfo.mintick*10000,"#.###"), text_color=C_NEUT, bgcolor=C_BG, text_size=ts)
+
+    stc = st_dc<0 ? C_BULL : C_BEAR
+    table.cell(tbl,0,2,"Trend",      text_color=C_TEXT, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,2,st_dc<0?"YUKARI":"AŞAĞI", text_color=stc, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,2,2,ok_s(s1u),   text_color=ok_c(s1u), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,3,2,ok_s(s2u),   text_color=ok_c(s2u), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,4,2,ok_s(s3u),   text_color=ok_c(s3u), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,5,2,ok_s(s4u),   text_color=ok_c(s4u), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,2,"ST(3.0,14)",text_color=C_NEUT,    bgcolor=C_BG, text_size=ts)
+
+    ec = close>ema200_c ? C_BULL : C_BEAR
+    table.cell(tbl,0,3,"EMA 200",   text_color=C_TEXT,  bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,3,close>ema200_c?"Üst":"Alt", text_color=ec, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,2,3,ok_s(t1),    text_color=ok_c(t1), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,3,3,ok_s(t2),    text_color=ok_c(t2), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,4,3,ok_s(t3),    text_color=ok_c(t3), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,5,3,ok_s(t4),    text_color=ok_c(t4), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,3,"Uzun Vade", text_color=C_NEUT,   bgcolor=C_BG, text_size=ts)
+
+    table.cell(tbl,0,4,"RSI",       text_color=C_TEXT,   bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,4,str.tostring(rsi_c,"#.#"), text_color=rc(rsi_c), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,2,4,str.tostring(r1,"#.#"),    text_color=rc(r1),    bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,3,4,str.tostring(r2,"#.#"),    text_color=rc(r2),    bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,4,4,str.tostring(r3,"#.#"),    text_color=rc(r3),    bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,5,4,str.tostring(r4,"#.#"),    text_color=rc(r4),    bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,4,"RSI(14)",   text_color=C_NEUT,   bgcolor=C_BG, text_size=ts)
+
+    stk_d = stoch_c>=80?"OB" : stoch_c<=20?"OS" : stoch_c>50?"↑":"↓"
+    stk_c = stoch_c<=20 ? C_BULL : stoch_c>=80 ? C_BEAR : C_NEUT
+    table.cell(tbl,0,5,"Stochastic",  text_color=C_TEXT,  bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,5,str.tostring(stoch_c,"#.#")+" ["+stk_d+"]", text_color=stk_c, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,2,5,ok_s(m1),      text_color=ok_c(m1), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,3,5,ok_s(m2),      text_color=ok_c(m2), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,4,5,ok_s(m3),      text_color=ok_c(m3), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,5,5,ok_s(m4),      text_color=ok_c(m4), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,5,"MACD→",       text_color=C_NEUT,   bgcolor=C_BG, text_size=ts)
+
+    table.cell(tbl,0,6,"Pivot",       text_color=C_TEXT,   bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,6,"PP:"+str.tostring(pp,"#.####"),   text_color=C_NEUT,bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,2,6,"R1:"+str.tostring(r1c,"#.####"),  text_color=C_BEAR,bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,3,6,"S1:"+str.tostring(s1c,"#.####"),  text_color=C_BULL,bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,4,6,"",            text_color=C_NEUT,  bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,5,6,"",            text_color=C_NEUT,  bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,6,"Günlük Pivot",text_color=C_NEUT,  bgcolor=C_BG, text_size=ts)
+
+    def_sc = (close>ema50_c?2:-2)+(close>ema200_c?2:-2)+(st_dc<0?2:-2)+(rsi_c>50?1:-1)+(macd_hc>0?1:-1)
+    cur_sc = math.max(0.0, math.min(10.0, (def_sc+8.0)/1.6))
+    table.cell(tbl,0,7,"Skor /10",   text_color=C_TEXT,    bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,7,str.tostring(cur_sc,"#.#"), text_color=sc(cur_sc), bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,2,7,str.tostring(k1,"#.#"),     text_color=sc(k1),     bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,3,7,str.tostring(k2,"#.#"),     text_color=sc(k2),     bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,4,7,str.tostring(k3,"#.#"),     text_color=sc(k3),     bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,5,7,str.tostring(k4,"#.#"),     text_color=sc(k4),     bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,7,"Konfluens",  text_color=C_NEUT,    bgcolor=C_BG, text_size=ts)
+
+    table.cell(tbl,0,8,"ATR / Risk",  text_color=C_TEXT,   bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,8,str.tostring(atr_c,"#.#####"), text_color=C_NEUT, bgcolor=C_BG, text_size=ts)
+    pip_val = atr_c / syminfo.mintick / 10
+    table.cell(tbl,2,8,str.tostring(pip_val,"#") + " pip", text_color=C_WARN, bgcolor=C_BG, text_size=ts)
+    for cc = 3 to 5
+        table.cell(tbl,cc,8,"", text_color=C_NEUT, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,8,"SL=1.5xATR pip", text_color=C_WARN, bgcolor=C_BG, text_size=ts)

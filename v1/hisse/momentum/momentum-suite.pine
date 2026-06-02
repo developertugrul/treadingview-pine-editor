@@ -1,0 +1,272 @@
+// @version=6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║        HİSSE MOMENTUM PAKETİ — v6                            ║
+// ║  RSI + MACD + Stochastic + Hacim + Uyarlanabilir Eşikler    ║
+// ║  Birlikte Çalışır: trend-suite · sinyal-suite                ║
+// ╚══════════════════════════════════════════════════════════════╝
+indicator("Hisse Momentum Paketi", overlay=false, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════
+// DARK MODE DETECTION
+// ══════════════════════════════════════════════════════════════
+_bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
+is_dark  = _bg_lum < 383
+
+C_BULL   = is_dark ? color.new(#00C851, 0) : color.new(#006621, 0)
+C_BEAR   = is_dark ? color.new(#FF4444, 0) : color.new(#CC0000, 0)
+C_NEUT   = is_dark ? color.new(#9B9B9B, 0) : color.new(#444444, 0)
+C_ACCENT = is_dark ? color.new(#2196F3, 0) : color.new(#1565C0, 0)
+C_WARN   = is_dark ? color.new(#FFC107, 0) : color.new(#E65100, 0)
+
+// ══════════════════════════════════════════════════════════════
+// INPUTS
+// ══════════════════════════════════════════════════════════════
+grp_rsi = "── RSI Ayarları ──"
+rsi_per   = input.int(14,   "RSI Periyot",     minval=2, maxval=50, group=grp_rsi)
+rsi_sig   = input.int(9,    "RSI Sinyal EMA",  minval=2, maxval=30, group=grp_rsi)
+rsi_adaptif = input.bool(true, "Adaptif OB/OS (ATR bazlı)", group=grp_rsi)
+rsi_ob    = input.int(70,   "OB Seviyesi (Sabit)",   minval=50, maxval=95, group=grp_rsi)
+rsi_os    = input.int(30,   "OS Seviyesi (Sabit)",   minval=5,  maxval=50, group=grp_rsi)
+
+grp_macd = "── MACD ──"
+macd_on   = input.bool(true, "MACD Göster", group=grp_macd)
+macd_fast = input.int(12,    "Hızlı EMA",   minval=2, group=grp_macd)
+macd_slow = input.int(26,    "Yavaş EMA",   minval=5, group=grp_macd)
+macd_sig  = input.int(9,     "Sinyal",      minval=2, group=grp_macd)
+
+grp_stoch = "── Stochastic ──"
+stoch_on  = input.bool(false, "Stochastic Göster", group=grp_stoch)
+stoch_k   = input.int(14,     "%K Periyot",  minval=2, group=grp_stoch)
+stoch_d   = input.int(3,      "%D Smooth",   minval=1, group=grp_stoch)
+stoch_s   = input.int(3,      "Smooth",      minval=1, group=grp_stoch)
+
+grp_vol = "── Hacim Analizi ──"
+vol_on  = input.bool(true, "Hacim Analizi Göster", group=grp_vol)
+vol_ma  = input.int(20,    "Hacim MA Periyot",     minval=5, group=grp_vol)
+
+grp_div = "── Diverjans Tespiti ──"
+div_on  = input.bool(true, "RSI Diverjansı Tespit Et", group=grp_div)
+div_lb  = input.int(5,     "Diverjans Lookback",       minval=2, maxval=20, group=grp_div)
+
+// ══════════════════════════════════════════════════════════════
+// RSI HESAPLAMASI
+// ══════════════════════════════════════════════════════════════
+rsi_val = ta.rsi(close, rsi_per)
+rsi_ema  = ta.ema(rsi_val, rsi_sig)
+
+// Adaptif OB/OS — Son 50 bara göre dinamik eşikler
+rsi_avg = ta.sma(rsi_val, 50)
+rsi_std = ta.stdev(rsi_val, 50)
+ob_adaptif = math.min(rsi_avg + rsi_std * 1.5, 85.0)
+os_adaptif = math.max(rsi_avg - rsi_std * 1.5, 15.0)
+
+// Aktif eşikler
+ob_aktif = rsi_adaptif ? ob_adaptif : float(rsi_ob)
+os_aktif = rsi_adaptif ? os_adaptif : float(rsi_os)
+
+// RSI bölge durumu
+rsi_asiri_alim  = rsi_val >= ob_aktif
+rsi_asiri_satim = rsi_val <= os_aktif
+rsi_pozitif     = rsi_val > 50.0
+rsi_kesisi_yukari = ta.crossover(rsi_val,  50.0)
+rsi_kesisi_asagi  = ta.crossunder(rsi_val, 50.0)
+rsi_ob_cikis  = ta.crossunder(rsi_val, ob_aktif)  // OB bölgesinden çıkış (satış sinyali)
+rsi_os_cikis  = ta.crossover(rsi_val,  os_aktif)  // OS bölgesinden çıkış (alış sinyali)
+
+// ══════════════════════════════════════════════════════════════
+// RSI DİVERJANS TESPİTİ
+// ══════════════════════════════════════════════════════════════
+// Fiyat high'ları ve RSI high'larını karşılaştır
+price_ph = ta.pivothigh(high, div_lb, div_lb)
+price_pl = ta.pivotlow(low,   div_lb, div_lb)
+rsi_ph   = ta.pivothigh(rsi_val, div_lb, div_lb)
+rsi_pl   = ta.pivotlow(rsi_val,  div_lb, div_lb)
+
+// Son pivotları sakla
+var float prev_price_ph = na, var float prev_rsi_ph = na
+var float prev_price_pl = na, var float prev_rsi_pl = na
+
+if not na(price_ph) and not na(rsi_ph)
+    prev_price_ph := price_ph
+    prev_rsi_ph   := rsi_ph
+if not na(price_pl) and not na(rsi_pl)
+    prev_price_pl := price_pl
+    prev_rsi_pl   := rsi_pl
+
+// Bearish divergence: Fiyat YH ama RSI DH
+bearish_div = div_on and not na(price_ph) and not na(rsi_ph) and not na(prev_price_ph) and not na(prev_rsi_ph) and price_ph > prev_price_ph and rsi_ph < prev_rsi_ph
+
+// Bullish divergence: Fiyat DH ama RSI YH
+bullish_div = div_on and not na(price_pl) and not na(rsi_pl) and not na(prev_price_pl) and not na(prev_rsi_pl) and price_pl < prev_price_pl and rsi_pl > prev_rsi_pl
+
+// Hidden Bullish: Fiyat YH ama RSI DH (trend devam sinyali)
+hidden_bull_div = div_on and not na(price_pl) and not na(rsi_pl) and not na(prev_price_pl) and not na(prev_rsi_pl) and price_pl > prev_price_pl and rsi_pl < prev_rsi_pl
+
+// Hidden Bearish: Fiyat DH ama RSI YH
+hidden_bear_div = div_on and not na(price_ph) and not na(rsi_ph) and not na(prev_price_ph) and not na(prev_rsi_ph) and price_ph < prev_price_ph and rsi_ph > prev_rsi_ph
+
+// ══════════════════════════════════════════════════════════════
+// MACD HESAPLAMASI
+// ══════════════════════════════════════════════════════════════
+[macd_line, macd_signal, macd_hist] = ta.macd(close, macd_fast, macd_slow, macd_sig)
+
+macd_pozitif = macd_hist > 0
+macd_yukari  = macd_hist > macd_hist[1]  // Artan histogram
+macd_cross_up   = ta.crossover(macd_line,  macd_signal)
+macd_cross_down = ta.crossunder(macd_line, macd_signal)
+
+// MACD normalize (RSI panelinde görünmesi için 0-100 arasına çek)
+// Ortalama + standart sapma bazlı normalizasyon
+macd_avg = ta.sma(macd_hist, 100)
+macd_std = ta.stdev(macd_hist, 100)
+macd_z   = macd_std != 0 ? (macd_hist - macd_avg) / macd_std : 0.0
+// -3σ ile +3σ arasını 0-100 arasına map et, 50 = sıfır çizgi
+macd_norm = math.max(0.0, math.min(100.0, 50.0 + macd_z * 15.0))
+
+// ══════════════════════════════════════════════════════════════
+// STOCHASTIC
+// ══════════════════════════════════════════════════════════════
+stoch_k_val = ta.sma(ta.stoch(close, high, low, stoch_k), stoch_s)
+stoch_d_val = ta.sma(stoch_k_val, stoch_d)
+stoch_cross_up   = ta.crossover(stoch_k_val,  stoch_d_val)
+stoch_cross_down = ta.crossunder(stoch_k_val, stoch_d_val)
+
+// ══════════════════════════════════════════════════════════════
+// HACİM ANALİZİ
+// ══════════════════════════════════════════════════════════════
+vol_ort = ta.sma(volume, vol_ma)
+rel_vol = vol_ort > 0 ? volume / vol_ort : 1.0   // Göreli hacim (1.0 = ortalama)
+vol_spike = rel_vol >= 2.0                          // 2x hacim spike
+
+// OBV normalize
+obv_val = ta.obv
+obv_ema = ta.ema(obv_val, 20)
+obv_yukari = obv_val > obv_ema
+
+// ══════════════════════════════════════════════════════════════
+// MOMENTUM SKORU (0-100)
+// Birden fazla faktör ağırlıklı skor
+// ══════════════════════════════════════════════════════════════
+skor = 0.0
+skor += rsi_val > 50    ? 20.0 : -20.0   // RSI sinyali (+/-20)
+skor += macd_pozitif    ? 20.0 : -20.0   // MACD pozitif (+/-20)
+skor += macd_yukari     ? 10.0 : -10.0   // MACD histogram artıyor (+/-10)
+skor += obv_yukari      ? 15.0 : -15.0   // OBV trend (+/-15)
+skor += rsi_asiri_satim ? 10.0 : 0.0     // Aşırı satım bonus (+10)
+skor += rsi_asiri_alim  ? 0.0  : 0.0     // Aşırı alım nötr
+
+// -75 ile 75 arasını 0-100 arasına normalize et
+momentum_skor = math.max(0.0, math.min(100.0, 50.0 + skor * (50.0/75.0)))
+
+// Skor rengi
+skor_rengi = momentum_skor >= 65 ? C_BULL :
+             momentum_skor <= 35 ? C_BEAR :
+             C_WARN
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — RSI
+// ══════════════════════════════════════════════════════════════
+rsi_col = rsi_asiri_alim ? C_BEAR : rsi_asiri_satim ? C_BULL : C_ACCENT
+plot(rsi_val, "RSI", color=rsi_col, linewidth=2)
+plot(rsi_ema,  "RSI Sinyal", color=color.new(C_WARN, 20), linewidth=1)
+
+// OB/OS band
+ob_plot = plot(ob_aktif, "Aşırı Alım",  color=color.new(C_BEAR, 60), linewidth=1, style=plot.style_line)
+os_plot = plot(os_aktif, "Aşırı Satım", color=color.new(C_BULL, 60), linewidth=1, style=plot.style_line)
+mid_plot= plot(50,       "Orta Çizgi",  color=color.new(C_NEUT, 70), linewidth=1, style=plot.style_line)
+
+// OB/OS fill
+fill(ob_plot, plot(100, display=display.none), color=color.new(C_BEAR, 92), title="OB Fill")
+fill(os_plot, plot(0,   display=display.none), color=color.new(C_BULL, 92), title="OS Fill")
+
+// RSI-EMA arası fill
+rsi_p  = plot(rsi_val, display=display.none)
+rema_p = plot(rsi_ema,  display=display.none)
+fill(rsi_p, rema_p,
+     color=rsi_val > rsi_ema ? color.new(C_BULL, 80) : color.new(C_BEAR, 80),
+     title="RSI/EMA Fill")
+
+// OB/OS bölgesinden çıkış sinyalleri
+plotshape(rsi_ob_cikis, "OB Çıkış (Sat)", shape.triangledown, location.top,    C_BEAR, size=size.tiny)
+plotshape(rsi_os_cikis, "OS Çıkış (Al)",  shape.triangleup,   location.bottom, C_BULL, size=size.tiny)
+
+// Diverjans sinyalleri
+plotshape(bearish_div,    "Bearish Div",     shape.xcross,       location.top,    C_BEAR, size=size.small)
+plotshape(bullish_div,    "Bullish Div",     shape.circle,       location.bottom, C_BULL, size=size.small)
+plotshape(hidden_bull_div,"Gizli Bull Div",  shape.diamond,      location.bottom, color.new(C_BULL, 40), size=size.tiny)
+plotshape(hidden_bear_div,"Gizli Bear Div",  shape.diamond,      location.top,    color.new(C_BEAR, 40), size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — MACD (normalize, RSI panelinde)
+// ══════════════════════════════════════════════════════════════
+// MACD histogram RSI'ın altında ince çubuklar olarak görünür
+macd_hist_col = macd_pozitif and macd_yukari  ? color.new(C_BULL, 20) :
+                macd_pozitif and not macd_yukari ? color.new(C_BULL, 60) :
+                not macd_pozitif and not macd_yukari ? color.new(C_BEAR, 20) :
+                color.new(C_BEAR, 60)
+
+plot(macd_on ? macd_norm : na, "MACD Normalize", color=macd_hist_col, linewidth=2, style=plot.style_histogram)
+
+// MACD cross sinyalleri
+plotshape(macd_on and macd_cross_up,   "MACD Al",  shape.triangleup,   location.bottom, C_BULL, size=size.tiny)
+plotshape(macd_on and macd_cross_down, "MACD Sat", shape.triangledown, location.top,    C_BEAR, size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — STOCHASTIC
+// ══════════════════════════════════════════════════════════════
+plot(stoch_on ? stoch_k_val : na, "Stoch %K", color=color.new(C_ACCENT, 0),  linewidth=1)
+plot(stoch_on ? stoch_d_val : na, "Stoch %D", color=color.new(C_WARN,   30), linewidth=1)
+
+// ══════════════════════════════════════════════════════════════
+// PLOT — MOMENTUM SKORU (arka plan rengi)
+// ══════════════════════════════════════════════════════════════
+// Momentum skoru çizgisi (ince noktalı çizgi)
+plot(momentum_skor, "Momentum Skoru", color=color.new(skor_rengi, 40),
+     linewidth=1, style=plot.style_stepline)
+
+// ══════════════════════════════════════════════════════════════
+// HACİM GÖSTERGESI (arka plan rengiyle hacim durumu)
+// ══════════════════════════════════════════════════════════════
+// Volume spike olduğunda arka plan rengi değişir
+bgcolor(vol_on and vol_spike ? color.new(C_WARN, 90) : na, title="Hacim Spike Arka Plan")
+
+// ══════════════════════════════════════════════════════════════
+// DURUM ETİKETLERİ
+// ══════════════════════════════════════════════════════════════
+if barstate.islast
+    // Özet label
+    rsi_durum  = rsi_asiri_alim ? "AŞIRI ALIM" : rsi_asiri_satim ? "AŞIRI SATIM" : rsi_pozitif ? "YÜKSELİŞ" : "DÜŞÜŞ"
+    macd_durum = macd_cross_up ? "↑KESIM" : macd_cross_down ? "↓KESIM" : macd_pozitif ? "POZ" : "NEG"
+    vol_durum  = vol_spike ? "⚡SPIKE" : rel_vol > 1.5 ? "YÜKSEK" : "NORMAL"
+
+    info_txt = "RSI:" + str.tostring(rsi_val, "#.#") + " [" + rsi_durum + "]\n" +
+               "MACD: " + macd_durum + " | Hacim: " + vol_durum + "\n" +
+               "Skor: " + str.tostring(momentum_skor, "#") + "/100"
+
+    info_col = momentum_skor >= 65 ? C_BULL : momentum_skor <= 35 ? C_BEAR : C_WARN
+
+    label.new(bar_index + 2, rsi_val,
+              info_txt,
+              color=color.new(info_col, 80),
+              textcolor=info_col,
+              style=label.style_label_left,
+              size=size.small)
+
+// ══════════════════════════════════════════════════════════════
+// ALERTLER
+// ══════════════════════════════════════════════════════════════
+alertcondition(rsi_os_cikis,    "RSI OS Çıkış (AL)",    "🟢 RSI Aşırı Satımdan Döndü | {{ticker}} RSI: " + str.tostring(rsi_val, "#.#"))
+alertcondition(rsi_ob_cikis,    "RSI OB Çıkış (SAT)",   "🔴 RSI Aşırı Alımdan Döndü | {{ticker}} RSI: " + str.tostring(rsi_val, "#.#"))
+alertcondition(bullish_div,     "Bullish Diverjans",     "🟢 RSI Bullish Diverjans | {{ticker}} @ {{close}}")
+alertcondition(bearish_div,     "Bearish Diverjans",     "🔴 RSI Bearish Diverjans | {{ticker}} @ {{close}}")
+alertcondition(macd_cross_up,   "MACD Al Sinyali",       "🟢 MACD Kesişim (AL) | {{ticker}} @ {{close}}")
+alertcondition(macd_cross_down, "MACD Sat Sinyali",      "🔴 MACD Kesişim (SAT) | {{ticker}} @ {{close}}")
+alertcondition(vol_spike,       "Hacim Spike",           "⚡ Hacim Spike (2x) | {{ticker}} | Hacim: {{volume}}")
+
+if barstate.isconfirmed
+    if bullish_div
+        alert('{"event":"BULLISH_DIV","ticker":"' + syminfo.ticker + '","rsi":' + str.tostring(rsi_val, "#.#") + ',"price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)
+    if bearish_div
+        alert('{"event":"BEARISH_DIV","ticker":"' + syminfo.ticker + '","rsi":' + str.tostring(rsi_val, "#.#") + ',"price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)
+    if vol_spike
+        alert("⚡ Hacim Spike: " + syminfo.ticker + " | " + str.tostring(rel_vol, "#.##") + "x ortalama", alert.freq_once_per_bar_close)
