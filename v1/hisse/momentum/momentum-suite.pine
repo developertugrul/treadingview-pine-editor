@@ -83,8 +83,10 @@ rsi_ph   = ta.pivothigh(rsi_val, div_lb, div_lb)
 rsi_pl   = ta.pivotlow(rsi_val,  div_lb, div_lb)
 
 // Son pivotları sakla
-var float prev_price_ph = na, var float prev_rsi_ph = na
-var float prev_price_pl = na, var float prev_rsi_pl = na
+var float prev_price_ph = na
+var float prev_rsi_ph   = na
+var float prev_price_pl = na
+var float prev_rsi_pl   = na
 
 if not na(price_ph) and not na(rsi_ph)
     prev_price_ph := price_ph

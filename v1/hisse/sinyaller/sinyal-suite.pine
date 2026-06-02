@@ -163,9 +163,12 @@ mtf_yukari = mtf_on ? mtf_e50 > mtf_e200 : true
 ph_lb = 10
 ph = ta.pivothigh(high, ph_lb, ph_lb)
 pl = ta.pivotlow(low, ph_lb, ph_lb)
-var float last_res = na, var float last_sup = na
-if not na(ph) : last_res := ph
-if not na(pl) : last_sup := pl
+var float last_res = na
+var float last_sup = na
+if not na(ph)
+    last_res := ph
+if not na(pl)
+    last_sup := pl
 
 atr_val = ta.atr(14)
 near_sup = not na(last_sup) and math.abs(close - last_sup) < atr_val * 0.5
@@ -214,8 +217,10 @@ sat_guclu = sat_skor >= 8 and barstate.isconfirmed
 // GRAFIK FORMASYONLARI
 // ══════════════════════════════════════════════════════════════
 // Double Top: İki yakın yüksek, arada düşüş
-var float dt_high1 = na, var float dt_high1_bar = na
-var float db_low1  = na, var float db_low1_bar  = na
+var float dt_high1     = na
+var int   dt_high1_bar = 0
+var float db_low1      = na
+var int   db_low1_bar  = 0
 
 if not na(ph)
     if na(dt_high1) or ph > dt_high1 * 1.02
@@ -225,16 +230,13 @@ if not na(ph)
         // Double Top tespiti
         true
 
-double_top    = not na(ph) and not na(dt_high1) and
+double_top    = not na(ph) and not na(dt_high1) and dt_high1 > 0 and
                 math.abs(ph - dt_high1) / dt_high1 < 0.02 and
-                bar_index - dt_high1_bar > 5 and
-                ta.lowest(low, int(bar_index - dt_high1_bar)) < dt_high1 * 0.97
+                (bar_index - dt_high1_bar) > 5
 
-// Double Bottom benzer şekilde
-double_bottom = not na(pl) and not na(db_low1) and
+double_bottom = not na(pl) and not na(db_low1) and db_low1 > 0 and
                 math.abs(pl - db_low1) / db_low1 < 0.02 and
-                bar_index - db_low1_bar > 5 and
-                ta.highest(high, int(bar_index - db_low1_bar)) > db_low1 * 1.03
+                (bar_index - db_low1_bar) > 5
 
 if not na(pl)
     if na(db_low1) or pl < db_low1 * 0.98
