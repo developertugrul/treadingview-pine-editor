@@ -108,9 +108,13 @@ var float res1 = na, var float res2 = na, var float res3 = na
 var float sup1 = na, var float sup2 = na, var float sup3 = na
 
 if not na(ph)
-    res3 := res2; res2 := res1; res1 := ph
+    res3 := res2
+    res2 := res1
+    res1 := ph
 if not na(pl)
-    sup3 := sup2; sup2 := sup1; sup1 := pl
+    sup3 := sup2
+    sup2 := sup1
+    sup1 := pl
 
 // ══════════════════════════════════════════════════════════════
 // PLOT — EMAlar

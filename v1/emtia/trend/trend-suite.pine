@@ -92,8 +92,12 @@ ph = ta.pivothigh(high, sr_lb, sr_lb)
 pl = ta.pivotlow(low,   sr_lb, sr_lb)
 var float res1 = na, var float res2 = na
 var float sup1 = na, var float sup2 = na
-if not na(ph) : res2 := res1; res1 := ph
-if not na(pl) : sup2 := sup1; sup1 := pl
+if not na(ph)
+    res2 := res1
+    res1 := ph
+if not na(pl)
+    sup2 := sup1
+    sup1 := pl
 
 // ══════════════════════════════════════════════════════════════
 // PLOT — EMA
@@ -105,8 +109,8 @@ c_e200 = is_dark ? color.new(#FF9800, 0) : color.new(#E65100, 0)   // Turuncu
 
 p_e20 = plot(ema20_on  ? ema20  : na, "EMA 20",  color=c_e20,  linewidth=1)
 p_e50 = plot(ema50_on  ? ema50  : na, "EMA 50",  color=c_e50,  linewidth=2)
-        plot(ema100_on ? ema100 : na, "EMA 100", color=c_e100, linewidth=2)
-        plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
+plot(ema100_on ? ema100 : na, "EMA 100", color=c_e100, linewidth=2)
+plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
 fill(p_e20, p_e50, color=ema20 > ema50 ? color.new(C_BULL,90) : color.new(C_BEAR,90))
 
 // SuperTrend
@@ -160,5 +164,7 @@ alertcondition(near_y_high and w52_on,  "52H Zirveye Yakın","⚠️ 52H Zirveye
 alertcondition(near_y_low  and w52_on,  "52H Dibe Yakın",  "⚠️ 52H Dibe Yakın | {{ticker}}")
 
 if barstate.isconfirmed
-    if st_alim  : alert('{"event":"EMTIA_ST_ALIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)
-    if st_satim : alert('{"event":"EMTIA_ST_SATIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)
+    if st_alim
+        alert('{"event":"EMTIA_ST_ALIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)
+    if st_satim
+        alert('{"event":"EMTIA_ST_SATIM","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + '}', alert.freq_once_per_bar_close)

@@ -101,8 +101,10 @@ ph_lb = 14  // Kripto için biraz daha uzun
 ph = ta.pivothigh(high, ph_lb, ph_lb)
 pl = ta.pivotlow(low, ph_lb, ph_lb)
 var float last_res = na, var float last_sup = na
-if not na(ph) : last_res := ph
-if not na(pl) : last_sup := pl
+if not na(ph)
+    last_res := ph
+if not na(pl)
+    last_sup := pl
 
 atr_val  = ta.atr(14)
 near_sup = not na(last_sup) and math.abs(close - last_sup) < atr_val * 0.7   // Kripto: daha geniş
@@ -114,7 +116,8 @@ rsi_l_min  = ta.lowest(rsi_lb, 14)
 rsi_l_max  = ta.highest(rsi_lb, 14)
 srsi_raw   = rsi_l_max - rsi_l_min > 0 ? (rsi_lb - rsi_l_min) / (rsi_l_max - rsi_l_min) * 100 : 50.0
 srsi_k     = ta.sma(srsi_raw, 3)
-srsi_os_signal = srsi_k <= 20 and ta.crossover(srsi_k, ta.sma(srsi_k, 3))
+srsi_cross = ta.crossover(srsi_k, ta.sma(srsi_k, 3))
+srsi_os_signal = srsi_k <= 20 and srsi_cross
 
 // ══════════════════════════════════════════════════════════════
 // KONFLUENS SKORU — KRİPTO AĞIRLIKLARI
@@ -149,9 +152,11 @@ al_guclu    = al_skor  >= 8 and barstate.isconfirmed
 sat_guclu   = sat_skor >= 8 and barstate.isconfirmed
 
 // Breakout
-consol_tight = (ta.highest(high, 20) - ta.lowest(low, 20)) / close < 0.06  // Kripto: %6
-breakout_up  = consol_tight and close > ta.highest(high, 20)[1] and rel_vol > 2.0
-breakout_dn  = consol_tight and close < ta.lowest(low,  20)[1] and rel_vol > 2.0
+hh20 = ta.highest(high, 20)
+ll20 = ta.lowest(low, 20)
+consol_tight = (hh20 - ll20) / close < 0.06  // Kripto: %6
+breakout_up  = consol_tight and close > hh20[1] and rel_vol > 2.0
+breakout_dn  = consol_tight and close < ll20[1] and rel_vol > 2.0
 
 // ══════════════════════════════════════════════════════════════
 // PLOT
@@ -188,8 +193,8 @@ if barstate.isconfirmed and kf_goster and (al_sinyali or sat_sinyali)
 // ══════════════════════════════════════════════════════════════
 // ALERTLER
 // ══════════════════════════════════════════════════════════════
-alertcondition(al_sinyali,  "Kripto AL",      "🟢 KRİPTO AL | {{ticker}} | Skor: " + str.tostring(al_skor) + "/10 @ {{close}}")
-alertcondition(sat_sinyali, "Kripto SAT",     "🔴 KRİPTO SAT | {{ticker}} | Skor: " + str.tostring(sat_skor) + "/10 @ {{close}}")
+alertcondition(al_sinyali,  "Kripto AL",      "🟢 KRİPTO AL | {{ticker}} @ {{close}}")
+alertcondition(sat_sinyali, "Kripto SAT",     "🔴 KRİPTO SAT | {{ticker}} @ {{close}}")
 alertcondition(al_guclu,    "Güçlü AL",       "🚀 GÜÇLÜ AL (8+) | {{ticker}} @ {{close}}")
 alertcondition(breakout_up, "Breakout ↑",     "🚀 KRİPTO BREAKOUT ↑ | {{ticker}} @ {{close}}")
 alertcondition(breakout_dn, "Breakout ↓",     "💥 KRİPTO BREAKOUT ↓ | {{ticker}} @ {{close}}")
@@ -199,9 +204,9 @@ if barstate.isconfirmed
         if webhook_on
             alert('{"event":"KRIPTO_AL","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"skor":' + str.tostring(al_skor) + ',"formasyon":"' + pattern_name + '","tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
         else
-            alert("🟢 KRİPTO AL: " + syminfo.ticker + " | Skor: " + str.tostring(al_skor) + "/10 | " + str.tostring(close,"#.##"), alert.freq_once_per_bar_close)
+            alert("🟢 KRİPTO AL: " + syminfo.ticker + " | " + str.tostring(close,"#.##"), alert.freq_once_per_bar_close)
     if sat_skor >= al_min_skor
         if webhook_on
             alert('{"event":"KRIPTO_SAT","ticker":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"skor":' + str.tostring(sat_skor) + ',"formasyon":"' + pattern_name + '","tf":"' + timeframe.period + '"}', alert.freq_once_per_bar_close)
         else
-            alert("🔴 KRİPTO SAT: " + syminfo.ticker + " | Skor: " + str.tostring(sat_skor) + "/10 | " + str.tostring(close,"#.##"), alert.freq_once_per_bar_close)
+            alert("🔴 KRİPTO SAT: " + syminfo.ticker + " | " + str.tostring(close,"#.##"), alert.freq_once_per_bar_close)

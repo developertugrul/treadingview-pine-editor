@@ -118,7 +118,7 @@ plot(ratio_on ? gsr_norm : na, "GSR Normalize",
 // PLOT — Fiyat/MA Oranı
 // ══════════════════════════════════════════════════════════════
 ma_col = ma_ratio > 5 ? C_BEAR : ma_ratio < -5 ? C_ACCENT : C_NEUT
-plot(ma_on ? ma_ratio_norm : na, "Fiyat/MA" + str.tostring(ma_per) + " Oranı",
+plot(ma_on ? ma_ratio_norm : na, "Fiyat/MA Oranı",
      color=ma_col, linewidth=1, style=plot.style_stepline)
 
 // ══════════════════════════════════════════════════════════════

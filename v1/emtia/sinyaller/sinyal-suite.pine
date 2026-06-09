@@ -32,9 +32,12 @@ dxy_symbol  = input.symbol("DXY", "DXY Sembolü")
 // ══════════════════════════════════════════════════════════════
 // MUM FORMASYONLARI
 // ══════════════════════════════════════════════════════════════
-body = math.abs(close-open); range_ = high-low
-wick_up = high-math.max(close,open); wick_dn = math.min(close,open)-low
-is_bull_bar = close>open; is_bear_bar = close<open
+body = math.abs(close-open)
+range_ = high-low
+wick_up = high-math.max(close,open)
+wick_dn = math.min(close,open)-low
+is_bull_bar = close>open
+is_bear_bar = close<open
 
 hammer       = is_bull_bar and wick_dn>body*2 and wick_up<body*0.5
 hanging_man  = is_bear_bar and wick_dn>body*2 and wick_up<body*0.5
@@ -81,8 +84,10 @@ ph_lb = 14
 ph = ta.pivothigh(high, ph_lb, ph_lb)
 pl = ta.pivotlow(low, ph_lb, ph_lb)
 var float last_res = na, var float last_sup = na
-if not na(ph) : last_res := ph
-if not na(pl) : last_sup := pl
+if not na(ph)
+    last_res := ph
+if not na(pl)
+    last_sup := pl
 near_sup = not na(last_sup) and math.abs(close-last_sup) < atr_v*0.8
 near_res = not na(last_res) and math.abs(close-last_res) < atr_v*0.8
 
@@ -149,8 +154,8 @@ if barstate.isconfirmed and (al_sinyali or sat_sinyali)
     label.new(bar_index, sp, sy + " " + str.tostring(sd) + "/10\n" + pattern_name + dxy_not,
               color=color.new(sc,70), textcolor=sc, style=ss, size=size.small)
 
-alertcondition(al_sinyali,  "Emtia AL",   "🟡 EMTİA AL | {{ticker}} | Skor: " + str.tostring(al_skor) + "/10 @ {{close}}")
-alertcondition(sat_sinyali, "Emtia SAT",  "🔴 EMTİA SAT | {{ticker}} | Skor: " + str.tostring(sat_skor) + "/10 @ {{close}}")
+alertcondition(al_sinyali,  "Emtia AL",   "🟡 EMTİA AL | {{ticker}} @ {{close}}")
+alertcondition(sat_sinyali, "Emtia SAT",  "🔴 EMTİA SAT | {{ticker}} @ {{close}}")
 alertcondition(al_guclu,    "Güçlü AL",   "🚀 EMTİA GÜÇLÜ AL (8+) | {{ticker}} @ {{close}}")
 
 if barstate.isconfirmed

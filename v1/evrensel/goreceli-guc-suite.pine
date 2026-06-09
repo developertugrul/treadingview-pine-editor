@@ -58,7 +58,7 @@ rs_raw = bench_close > 0 ? close / bench_close : na
 
 // RS Change = RS oranının yüzde değişimi (rs_per barda)
 rs_change = not na(rs_raw) and not na(rs_raw[rs_per]) and rs_raw[rs_per] > 0 ?
-            (rs_raw - rs_raw[rs_per]) / rs_raw[rs_per] * 100 : 0.0
+           (rs_raw - rs_raw[rs_per]) / rs_raw[rs_per] * 100 : 0.0
 
 // RS düzgünleştirme
 rs_ema   = ta.ema(rs_change, smooth_per)
@@ -89,8 +89,8 @@ alfa        = fark  // Fazla getiri (alfa)
 // ══════════════════════════════════════════════════════════════
 rs_cross_up   = ta.crossover(rs_change,  0)    // RS sıfırın üstüne geçti
 rs_cross_down = ta.crossunder(rs_change, 0)    // RS sıfırın altına geçti
-rs_güçlendi   = rs_trend and not rs_trend[1]    // RS yukarı döndü
-rs_zayıfladı  = not rs_trend and rs_trend[1]    // RS aşağı döndü
+rs_guclendi   = rs_trend and not rs_trend[1]    // RS yukarı döndü
+rs_zayifladi  = not rs_trend and rs_trend[1]    // RS aşağı döndü
 
 // En güçlü kombinasyon: Endeks düşerken RS yüksek
 bench_dusus = bench_close < bench_close[5]
@@ -109,7 +109,7 @@ plot(0, "Sıfır", color=color.new(C_NEUT, 50), linewidth=1, style=plot.style_li
 // RS ortalama ve std bölgeleri
 rs_ob_plot = plot(rs_avg + rs_std, "RS OB Bölgesi", color=color.new(C_BEAR, 70), linewidth=1, style=plot.style_circles)
 rs_os_plot = plot(rs_avg - rs_std, "RS OS Bölgesi", color=color.new(C_BULL, 70), linewidth=1, style=plot.style_circles)
-            plot(rs_avg,           "RS Ortalama",   color=color.new(C_NEUT, 60), linewidth=1, style=plot.style_circles)
+plot(rs_avg,           "RS Ortalama",   color=color.new(C_NEUT, 60), linewidth=1, style=plot.style_circles)
 
 fill(rs_ob_plot, plot(rs_avg + rs_std * 2, display=display.none), color=color.new(C_BEAR, 93))
 fill(rs_os_plot, plot(rs_avg - rs_std * 2, display=display.none), color=color.new(C_BULL, 93))
@@ -188,7 +188,7 @@ alertcondition(rs_cross_up,   "RS Pozitife Geçti",  "🟢 Göreceli Güç Pozit
 alertcondition(rs_cross_down, "RS Negatife Geçti",  "🔴 Göreceli Güç Negatif | {{ticker}} vs Endeks")
 alertcondition(savunmaci_guc, "Savunmacı Güç",      "⭐ Savunmacı Güç: {{ticker}} piyasa düşerken güçlü!")
 alertcondition(rs_strong_bull,"RS Güçlü Bölge",     "🟢 RS Güçlü Bölgede | {{ticker}}")
-alertcondition(outperform and rs_güçlendi, "Outperform + RS Güçlendi", "🚀 Outperform + RS Güçleniyor | {{ticker}}")
+alertcondition(outperform and rs_guclendi, "Outperform + RS Güçlendi", "🚀 Outperform + RS Güçleniyor | {{ticker}}")
 
 if barstate.isconfirmed
     if savunmaci_guc

@@ -31,9 +31,12 @@ mtf_tf      = input.timeframe("D", "MTF TF")
 // ══════════════════════════════════════════════════════════════
 // MUM FORMASYONLARI
 // ══════════════════════════════════════════════════════════════
-body = math.abs(close - open); range_ = high - low
-wick_up = high - math.max(close,open); wick_dn = math.min(close,open) - low
-is_bull_bar = close > open; is_bear_bar = close < open
+body = math.abs(close - open)
+range_ = high - low
+wick_up = high - math.max(close,open)
+wick_dn = math.min(close,open) - low
+is_bull_bar = close > open
+is_bear_bar = close < open
 
 hammer       = is_bull_bar and wick_dn>body*2 and wick_up<body*0.5
 hanging_man  = is_bear_bar and wick_dn>body*2 and wick_up<body*0.5
@@ -156,8 +159,8 @@ if barstate.isconfirmed and (al_sinyali or sat_sinyali)
 pivot_break_r1 = ta.crossover(close,  r1)
 pivot_break_s1 = ta.crossunder(close, s1)
 
-alertcondition(al_sinyali,  "Kur AL",  "🟢 KUR AL | {{ticker}} | Skor: " + str.tostring(al_skor_final) + "/10 @ {{close}}")
-alertcondition(sat_sinyali, "Kur SAT", "🔴 KUR SAT | {{ticker}} | Skor: " + str.tostring(sat_skor_final) + "/10 @ {{close}}")
+alertcondition(al_sinyali,  "Kur AL",  "🟢 KUR AL | {{ticker}} @ {{close}}")
+alertcondition(sat_sinyali, "Kur SAT", "🔴 KUR SAT | {{ticker}} @ {{close}}")
 alertcondition(al_guclu,    "Güçlü AL","🚀 KUR GÜÇLÜ AL (8+) | {{ticker}} @ {{close}}")
 
 if barstate.isconfirmed

@@ -328,7 +328,7 @@ if barstate.isconfirmed
                   ',"zaman":"' + str.tostring(timenow) + '"}',
                   alert.freq_once_per_bar_close)
         else
-            alert("🟢 AL: " + syminfo.ticker + " | Skor: " + str.tostring(al_skor) + "/10 | " + pattern_name + " | " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)
+            alert("🟢 AL: " + syminfo.ticker + " | " + pattern_name + " | " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)
 
     if sat_skor >= al_min_skor
         if webhook_on
@@ -339,4 +339,4 @@ if barstate.isconfirmed
                   ',"zaman":"' + str.tostring(timenow) + '"}',
                   alert.freq_once_per_bar_close)
         else
-            alert("🔴 SAT: " + syminfo.ticker + " | Skor: " + str.tostring(sat_skor) + "/10 | " + pattern_name + " | " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)
+            alert("🔴 SAT: " + syminfo.ticker + " | " + pattern_name + " | " + str.tostring(close, "#.##"), alert.freq_once_per_bar_close)

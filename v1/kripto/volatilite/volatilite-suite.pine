@@ -80,14 +80,14 @@ bb_break_down = ta.crossunder(close, bb_lower)
 bb_band_col  = squeeze_aktif ? color.new(C_WARN, 25) : color.new(C_ACCENT, 40)
 bb_u = plot(bb_on ? bb_upper : na, "BB Üst",  color=bb_band_col, linewidth=1)
 bb_l = plot(bb_on ? bb_lower : na, "BB Alt",  color=bb_band_col, linewidth=1)
-       plot(bb_on ? bb_basis : na, "BB Orta", color=color.new(C_NEUT, 60), linewidth=1, style=plot.style_circles)
+plot(bb_on ? bb_basis : na, "BB Orta", color=color.new(C_NEUT, 60), linewidth=1, style=plot.style_circles)
 
 fill(bb_u, bb_l, color=bb_on ? (squeeze_aktif ? color.new(C_WARN, 90) : color.new(C_ACCENT, 94)) : na)
 
 kc_col = color.new(C_NEUT, 65)
 kc_u = plot(kc_on ? kc_upper : na, "KC Üst", color=kc_col, linewidth=1)
 kc_l = plot(kc_on ? kc_lower : na, "KC Alt", color=kc_col, linewidth=1)
-       plot(kc_on ? kc_basis : na, "KC Orta",color=color.new(C_NEUT, 80), linewidth=1)
+plot(kc_on ? kc_basis : na, "KC Orta",color=color.new(C_NEUT, 80), linewidth=1)
 
 plot(atr_on ? atr_upper : na, "ATR Üst", color=color.new(C_BEAR, 70), linewidth=1, style=plot.style_stepline)
 plot(atr_on ? atr_lower : na, "ATR Alt", color=color.new(C_BULL, 70), linewidth=1, style=plot.style_stepline)

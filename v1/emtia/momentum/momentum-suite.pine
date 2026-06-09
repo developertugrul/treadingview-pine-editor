@@ -49,8 +49,12 @@ rsi_ph   = ta.pivothigh(rsi_val, div_lb, div_lb)
 rsi_pl   = ta.pivotlow(rsi_val,  div_lb, div_lb)
 var float pph = na, var float rph = na
 var float ppl = na, var float rpl = na
-if not na(price_ph) and not na(rsi_ph) : pph := price_ph; rph := rsi_ph
-if not na(price_pl) and not na(rsi_pl) : ppl := price_pl; rpl := rsi_pl
+if not na(price_ph) and not na(rsi_ph)
+    pph := price_ph
+    rph := rsi_ph
+if not na(price_pl) and not na(rsi_pl)
+    ppl := price_pl
+    rpl := rsi_pl
 bearish_div = div_on and not na(price_ph) and not na(rsi_ph) and not na(pph) and price_ph > pph and rsi_ph < rph
 bullish_div = div_on and not na(price_pl) and not na(rsi_pl) and not na(ppl) and price_pl < ppl and rsi_pl > rpl
 
@@ -102,7 +106,7 @@ plot(rsi_ema, "RSI EMA", color=color.new(C_WARN,20), linewidth=1)
 
 ob_p = plot(ob_aktif, "OB", color=color.new(C_BEAR,60), linewidth=1)
 os_p = plot(os_aktif, "OS", color=color.new(C_ACCENT,60), linewidth=1)
-       plot(50, "50",        color=color.new(C_NEUT,70), linewidth=1)
+plot(50, "50",        color=color.new(C_NEUT,70), linewidth=1)
 fill(ob_p, plot(100,display=display.none), color=color.new(C_BEAR,92))
 fill(os_p, plot(0,  display=display.none), color=color.new(C_ACCENT,92))
 

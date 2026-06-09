@@ -74,8 +74,12 @@ rsi_pl   = ta.pivotlow(rsi_val,  div_lb, div_lb)
 var float prev_pph = na, var float prev_rph = na
 var float prev_ppl = na, var float prev_rpl = na
 
-if not na(price_ph) and not na(rsi_ph) : prev_pph := price_ph; prev_rph := rsi_ph
-if not na(price_pl) and not na(rsi_pl) : prev_ppl := price_pl; prev_rpl := rsi_pl
+if not na(price_ph) and not na(rsi_ph)
+    prev_pph := price_ph
+    prev_rph := rsi_ph
+if not na(price_pl) and not na(rsi_pl)
+    prev_ppl := price_pl
+    prev_rpl := rsi_pl
 
 bearish_div   = div_on and not na(price_ph) and not na(rsi_ph) and not na(prev_pph) and price_ph > prev_pph and rsi_ph < prev_rph
 bullish_div   = div_on and not na(price_pl) and not na(rsi_pl) and not na(prev_ppl) and price_pl < prev_ppl and rsi_pl > prev_rpl
@@ -141,7 +145,7 @@ plot(rsi_sig, "RSI Sinyal", color=color.new(C_WARN, 20), linewidth=1)
 
 ob_p = plot(ob_aktif, "OB",  color=color.new(C_BEAR, 60), linewidth=1)
 os_p = plot(os_aktif, "OS",  color=color.new(C_BULL, 60), linewidth=1)
-       plot(50,        "50", color=color.new(C_NEUT, 70), linewidth=1)
+plot(50,        "50", color=color.new(C_NEUT, 70), linewidth=1)
 fill(ob_p, plot(100, display=display.none), color=color.new(C_BEAR, 92))
 fill(os_p, plot(0,   display=display.none), color=color.new(C_BULL, 92))
 
@@ -182,11 +186,11 @@ bgcolor(vol_on and vol_spike ? color.new(C_WARN, 90) : na, title="Hacim Spike")
 // ETİKET
 // ══════════════════════════════════════════════════════════════
 if barstate.islast
-    rsi_d  = rsi_asiri_alim ? "AŞIRI ALIM" : rsi_asiri_satim ? "AŞIRI SATIM" : rsi_val > 50 ? "YÜKSELİŞ" : "DÜŞÜŞ"
-    srsi_d = srsi_ob ? "OB" : srsi_os ? "OS" : stoch_rsi_k > stoch_rsi_d ? "↑" : "↓"
+    rsi_desc  = rsi_asiri_alim ? "AŞIRI ALIM" : rsi_asiri_satim ? "AŞIRI SATIM" : rsi_val > 50 ? "YÜKSELİŞ" : "DÜŞÜŞ"
+    srsi_desc = srsi_ob ? "OB" : srsi_os ? "OS" : stoch_rsi_k > stoch_rsi_d ? "↑" : "↓"
     label.new(bar_index + 2, rsi_val,
-              "RSI:" + str.tostring(rsi_val,"#.#") + " [" + rsi_d + "]\n" +
-              "StochRSI: " + str.tostring(stoch_rsi_k,"#.#") + " [" + srsi_d + "]\n" +
+              "RSI:" + str.tostring(rsi_val,"#.#") + " [" + rsi_desc + "]\n" +
+              "StochRSI: " + str.tostring(stoch_rsi_k,"#.#") + " [" + srsi_desc + "]\n" +
               "Skor: " + str.tostring(momentum_skor,"#") + "/100",
               color=color.new(skor_rengi, 80), textcolor=skor_rengi,
               style=label.style_label_left, size=size.small)

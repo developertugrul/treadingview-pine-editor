@@ -123,9 +123,9 @@ bgcolor(overlap_tkld ? color.new(#FFD54F, is_dark ? 88 : 90) : na, title="TK/LD 
 // ══════════════════════════════════════════════════════════════
 // SEANS AÇILIŞ ÇİZGİLERİ
 // ══════════════════════════════════════════════════════════════
-plotshape(londra_on and londra_open, "Londra Açılış", shape.triangleright, location.high, color.new(C_WARN, 0), size=size.small)
-plotshape(ny_on     and ny_open,     "NY Açılış",     shape.triangleright, location.high, color.new(C_BEAR, 0), size=size.small)
-plotshape(tokyo_on  and tokyo_open,  "Tokyo Açılış",  shape.triangleright, location.high, color.new(C_ACCENT,0), size=size.small)
+plotshape(londra_on and londra_open, "Londra Açılış", shape.flag, location.abovebar, color.new(C_WARN, 0), size=size.small)
+plotshape(ny_on     and ny_open,     "NY Açılış",     shape.flag, location.abovebar, color.new(C_BEAR, 0), size=size.small)
+plotshape(tokyo_on  and tokyo_open,  "Tokyo Açılış",  shape.flag, location.abovebar, color.new(C_ACCENT,0), size=size.small)
 
 // ══════════════════════════════════════════════════════════════
 // PLOT — Asian Range
