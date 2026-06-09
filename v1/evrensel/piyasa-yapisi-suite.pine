@@ -111,23 +111,31 @@ if not na(pl)
     last_confirmed_pl := pl
 
 // Bullish BoS: Downtrend içinde önemli yüksek kırıldı
-bullish_bos = not na(last_confirmed_ph) and ta.crossover(close, last_confirmed_ph) and downtrend[1]
+bool cross_ph = ta.crossover(close, last_confirmed_ph)
+bullish_bos = not na(last_confirmed_ph) and cross_ph and downtrend[1]
 
 // Bearish BoS: Uptrend içinde önemli düşük kırıldı
-bearish_bos = not na(last_confirmed_pl) and ta.crossunder(close, last_confirmed_pl) and uptrend[1]
+bool cross_pl = ta.crossunder(close, last_confirmed_pl)
+bearish_bos = not na(last_confirmed_pl) and cross_pl and uptrend[1]
 
 // ChoCh (Change of Character): BoS öncesi momentum değişimi
 // Bullish ChoCh: İlk HL oluşumu (LH/LL trendinde ilk HL = karakteristik değişim)
 var bool prev_downtrend = false
-if downtrend : prev_downtrend := true
+if downtrend
+    prev_downtrend := true
 
 bullish_choch = prev_downtrend and hl and not ll   // HL var ama henüz BoS değil
 bearish_choch = not uptrend[1] and lh and not hh  // LH oluştu ama henüz BoS değil
 
 // BoS sonrası durumu güncelle
 var float bos_level = na
-if bullish_bos : bos_level := last_confirmed_ph; prev_downtrend := false
-if bearish_bos : bos_level := last_confirmed_pl; prev_downtrend := true
+if bullish_bos
+    bos_level := last_confirmed_ph
+    prev_downtrend := false
+
+if bearish_bos
+    bos_level := last_confirmed_pl
+    prev_downtrend := true
 
 // ══════════════════════════════════════════════════════════════
 // LİKİDİTE SEVİYELERİ (Equal Highs / Equal Lows)

@@ -113,8 +113,8 @@ plot(float(rejim_puan), "Rejim Puanı (0-6)",
      color=rejim_col, linewidth=3, style=plot.style_histogram)
 
 // Eşik çizgileri
-plot(5.0, "Bull Eşiği (5)",  color=color.new(C_BULL, 50), linewidth=1, style=plot.style_dashed)
-plot(2.0, "Bear Eşiği (2)",  color=color.new(C_BEAR, 50), linewidth=1, style=plot.style_dashed)
+plot(5.0, "Bull Eşiği (5)",  color=color.new(C_BULL, 50), linewidth=1, style=plot.style_circles)
+plot(2.0, "Bear Eşiği (2)",  color=color.new(C_BEAR, 50), linewidth=1, style=plot.style_circles)
 
 // ══════════════════════════════════════════════════════════════
 // PLOT — ADX
@@ -186,13 +186,13 @@ if barstate.islast
 
     // Öneri
     oneri_txt = rejim_bull  and trend_var  ? "✅ LONG sinyallerini değerlendir" :
-                rejim_bull  and not trend_var ? "⚠️ LONG ama trend zayıf — dikkatli" :
-                rejim_bear  and trend_var  ? "🚫 LONG YAPMA — Bear + Trend güçlü" :
-                rejim_bear               ? "⚠️ LONG için çok dikkatli ol" :
-                vol_siki                 ? "⏳ Patlama bekle (sıkışma)" :
-                "🔄 Seçici ol — trend belirsiz"
+               rejim_bull  and not trend_var ? "⚠️ LONG ama trend zayıf — dikkatli" :
+               rejim_bear  and trend_var  ? "🚫 LONG YAPMA — Bear + Trend güçlü" :
+               rejim_bear               ? "⚠️ LONG için çok dikkatli ol" :
+               vol_siki                 ? "⏳ Patlama bekle (sıkışma)" :
+               "🔄 Seçici ol — trend belirsiz"
     oneri_col = rejim_bull and trend_var ? C_BULL :
-                rejim_bear and trend_var ? C_BEAR : C_WARN
+               rejim_bear and trend_var ? C_BEAR : C_WARN
     table.cell(tbl, 0, 7, "Öneri", text_color=tc, bgcolor=bg, text_size=ts)
     table.cell(tbl, 1, 7, oneri_txt, text_color=oneri_col, bgcolor=bg, text_size=ts)
 

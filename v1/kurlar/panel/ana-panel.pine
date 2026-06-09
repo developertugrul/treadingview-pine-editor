@@ -1,13 +1,13 @@
 // @version=6
-// â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-// â•‘         KURLAR ANA PANELÄ° â€” v6                              â•‘
-// â•‘  Forex Multi-Timeframe Dashboard Â· Seans Â· Pivot Â· MTF       â•‘
-// â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ╔══════════════════════════════════════════════════════════════╗
+// ║         KURLAR ANA PANELİ — v6                              ║
+// ║  Forex Multi-Timeframe Dashboard · Seans · Pivot · MTF       ║
+// ╚══════════════════════════════════════════════════════════════╝
 indicator("Kurlar Ana Panel", overlay=true, max_bars_back=500)
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
 // DARK MODE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
 _bg_lum  = color.r(chart.bg_color) + color.g(chart.bg_color) + color.b(chart.bg_color)
 is_dark  = _bg_lum < 383
 
@@ -20,19 +20,19 @@ C_BG     = is_dark ? color.new(#1A2535, 85) : color.new(#F0F4FA, 85)  // Forex t
 C_TEXT   = is_dark ? color.new(#E0E0E0, 0)  : color.new(#111111, 0)
 C_BORDER = is_dark ? color.new(#2A3545, 0)  : color.new(#AABBCC, 0)
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
 // INPUTS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-panel_konum = input.string("SaÄŸ Ãœst", "Konum", options=["SaÄŸ Ãœst","SaÄŸ Alt","Sol Ãœst","Sol Alt"])
-panel_boyut = input.string("Normal",  "Boyut", options=["KÃ¼Ã§Ã¼k","Normal","BÃ¼yÃ¼k"])
+// ══════════════════════════════════════════════════════════════
+panel_konum = input.string("Sağ Üst", "Konum", options=["Sağ Üst","Sağ Alt","Sol Üst","Sol Alt"])
+panel_boyut = input.string("Normal",  "Boyut", options=["Küçük","Normal","Büyük"])
 mtf1 = input.timeframe("15",  "TF 1")
 mtf2 = input.timeframe("60",  "TF 2")
 mtf3 = input.timeframe("240", "TF 3")
 mtf4 = input.timeframe("D",   "TF 4")
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
 // HESAPLAMALAR
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
 ema50_c  = ta.ema(close, 50)
 ema200_c = ta.ema(close, 200)
 [st_c,st_dc] = ta.supertrend(3.0,14)
@@ -52,11 +52,11 @@ s1c = 2*pp - prev_h
 // Seans
 cur_h = hour(time,"UTC")
 aktif_seans = cur_h >= 7 and cur_h < 21
-seans_txt = cur_h >= 12 and cur_h < 16 ? "LD/NY OVERLAPðŸ”¥" :
-           cur_h >= 7  and cur_h < 9  ? "TK/LD OverlapðŸ”¶" :
-           cur_h >= 7  and cur_h < 16 ? "LondraðŸŸ¡" :
-           cur_h >= 12 and cur_h < 21 ? "New YorkðŸ”´" :
-           cur_h >= 0  and cur_h < 9  ? "TokyoðŸ”µ" : "KapalÄ±ðŸ’¤"
+seans_txt = cur_h >= 12 and cur_h < 16 ? "LD/NY OVERLAP🔥" :
+           cur_h >= 7  and cur_h < 9  ? "TK/LD Overlap🔶" :
+           cur_h >= 7  and cur_h < 16 ? "Londra🟡" :
+           cur_h >= 12 and cur_h < 21 ? "New York🔴" :
+           cur_h >= 0  and cur_h < 9  ? "Tokyo🔵" : "Kapalı💤"
 
 // MTF fonksiyon
 f_skor(tf) =>
@@ -74,24 +74,24 @@ f_skor(tf) =>
 [r3,m3,s3u,t3,k3] = f_skor(mtf3)
 [r4,m4,s4u,t4,k4] = f_skor(mtf4)
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
 // YARDIMCILAR
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-ok_s(b) => b ? "â†‘" : "â†“"
+// ══════════════════════════════════════════════════════════════
+ok_s(b) => b ? "↑" : "↓"
 ok_c(b) => b ? C_BULL : C_BEAR
 rc(r)   => r >= 70 ? C_BEAR : r <= 30 ? C_BULL : r >= 55 ? color.new(C_BULL,40) : r <= 45 ? color.new(C_BEAR,40) : C_NEUT
 sc(s)   => s >= 7 ? C_BULL : s <= 3 ? C_BEAR : C_WARN
 
-tbl_pos = panel_konum == "SaÄŸ Ãœst" ? position.top_right : panel_konum == "SaÄŸ Alt" ? position.bottom_right :
-          panel_konum == "Sol Ãœst" ? position.top_left  : position.bottom_left
-ts = panel_boyut == "KÃ¼Ã§Ã¼k" ? size.tiny : panel_boyut == "BÃ¼yÃ¼k" ? size.normal : size.small
+tbl_pos = panel_konum == "Sağ Üst" ? position.top_right : panel_konum == "Sağ Alt" ? position.bottom_right :
+          panel_konum == "Sol Üst" ? position.top_left  : position.bottom_left
+ts = panel_boyut == "Küçük" ? size.tiny : panel_boyut == "Büyük" ? size.normal : size.small
 
 var table tbl = table.new(tbl_pos, 7, 9, border_width=1, border_color=C_BORDER, frame_color=C_BORDER, frame_width=1)
 
 if barstate.islast
     hc = color.new(C_ACCENT, 65)
-    table.cell(tbl,0,0,"ðŸ’± " + syminfo.ticker, text_color=C_TEXT, bgcolor=hc, text_size=ts)
-    table.cell(tbl,1,0,"AnlÄ±k",  text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,0,0,"💱 " + syminfo.ticker, text_color=C_TEXT, bgcolor=hc, text_size=ts)
+    table.cell(tbl,1,0,"Anlık",  text_color=C_TEXT, bgcolor=hc, text_size=ts)
     table.cell(tbl,2,0,mtf1,     text_color=C_TEXT, bgcolor=hc, text_size=ts)
     table.cell(tbl,3,0,mtf2,     text_color=C_TEXT, bgcolor=hc, text_size=ts)
     table.cell(tbl,4,0,mtf3,     text_color=C_TEXT, bgcolor=hc, text_size=ts)
@@ -110,7 +110,7 @@ if barstate.islast
 
     stc = st_dc<0 ? C_BULL : C_BEAR
     table.cell(tbl,0,2,"Trend",      text_color=C_TEXT, bgcolor=C_BG, text_size=ts)
-    table.cell(tbl,1,2,st_dc<0?"YUKARI":"AÅžAÄžI", text_color=stc, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,2,st_dc<0?"YUKARI":"AŞAĞI", text_color=stc, bgcolor=C_BG, text_size=ts)
     table.cell(tbl,2,2,ok_s(s1u),   text_color=ok_c(s1u), bgcolor=C_BG, text_size=ts)
     table.cell(tbl,3,2,ok_s(s2u),   text_color=ok_c(s2u), bgcolor=C_BG, text_size=ts)
     table.cell(tbl,4,2,ok_s(s3u),   text_color=ok_c(s3u), bgcolor=C_BG, text_size=ts)
@@ -119,7 +119,7 @@ if barstate.islast
 
     ec = close>ema200_c ? C_BULL : C_BEAR
     table.cell(tbl,0,3,"EMA 200",   text_color=C_TEXT,  bgcolor=C_BG, text_size=ts)
-    table.cell(tbl,1,3,close>ema200_c?"Ãœst":"Alt", text_color=ec, bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,1,3,close>ema200_c?"Üst":"Alt", text_color=ec, bgcolor=C_BG, text_size=ts)
     table.cell(tbl,2,3,ok_s(t1),    text_color=ok_c(t1), bgcolor=C_BG, text_size=ts)
     table.cell(tbl,3,3,ok_s(t2),    text_color=ok_c(t2), bgcolor=C_BG, text_size=ts)
     table.cell(tbl,4,3,ok_s(t3),    text_color=ok_c(t3), bgcolor=C_BG, text_size=ts)
@@ -134,7 +134,7 @@ if barstate.islast
     table.cell(tbl,5,4,str.tostring(r4,"#.#"),    text_color=rc(r4),    bgcolor=C_BG, text_size=ts)
     table.cell(tbl,6,4,"RSI(14)",   text_color=C_NEUT,   bgcolor=C_BG, text_size=ts)
 
-    stk_d = stoch_c>=80?"OB" : stoch_c<=20?"OS" : stoch_c>50?"â†‘":"â†“"
+    stk_d = stoch_c>=80?"OB" : stoch_c<=20?"OS" : stoch_c>50?"↑":"↓"
     stk_c = stoch_c<=20 ? C_BULL : stoch_c>=80 ? C_BEAR : C_NEUT
     table.cell(tbl,0,5,"Stochastic",  text_color=C_TEXT,  bgcolor=C_BG, text_size=ts)
     table.cell(tbl,1,5,str.tostring(stoch_c,"#.#")+" ["+stk_d+"]", text_color=stk_c, bgcolor=C_BG, text_size=ts)
@@ -142,7 +142,7 @@ if barstate.islast
     table.cell(tbl,3,5,ok_s(m2),      text_color=ok_c(m2), bgcolor=C_BG, text_size=ts)
     table.cell(tbl,4,5,ok_s(m3),      text_color=ok_c(m3), bgcolor=C_BG, text_size=ts)
     table.cell(tbl,5,5,ok_s(m4),      text_color=ok_c(m4), bgcolor=C_BG, text_size=ts)
-    table.cell(tbl,6,5,"MACDâ†’",       text_color=C_NEUT,   bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,5,"MACD→",       text_color=C_NEUT,   bgcolor=C_BG, text_size=ts)
 
     table.cell(tbl,0,6,"Pivot",       text_color=C_TEXT,   bgcolor=C_BG, text_size=ts)
     table.cell(tbl,1,6,"PP:"+str.tostring(pp,"#.####"),   text_color=C_NEUT,bgcolor=C_BG, text_size=ts)
@@ -150,7 +150,7 @@ if barstate.islast
     table.cell(tbl,3,6,"S1:"+str.tostring(s1c,"#.####"),  text_color=C_BULL,bgcolor=C_BG, text_size=ts)
     table.cell(tbl,4,6,"",            text_color=C_NEUT,  bgcolor=C_BG, text_size=ts)
     table.cell(tbl,5,6,"",            text_color=C_NEUT,  bgcolor=C_BG, text_size=ts)
-    table.cell(tbl,6,6,"GÃ¼nlÃ¼k Pivot",text_color=C_NEUT,  bgcolor=C_BG, text_size=ts)
+    table.cell(tbl,6,6,"Günlük Pivot",text_color=C_NEUT,  bgcolor=C_BG, text_size=ts)
 
     def_sc = (close>ema50_c?2:-2)+(close>ema200_c?2:-2)+(st_dc<0?2:-2)+(rsi_c>50?1:-1)+(macd_hc>0?1:-1)
     cur_sc = math.max(0.0, math.min(10.0, (def_sc+8.0)/1.6))

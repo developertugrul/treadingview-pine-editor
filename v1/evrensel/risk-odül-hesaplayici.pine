@@ -107,11 +107,11 @@ plot(giris_cizgi and not na(aktif_sl) ? aktif_sl : na, "Stop-Loss",
 
 // TP çizgileri
 plot(giris_cizgi and not na(aktif_sl) and sl_mesafe > 0 ? tp1 : na, "TP1 (1:1)",
-     color=color.new(C_BULL, 60), linewidth=1, style=plot.style_dashed)
+     color=color.new(C_BULL, 60), linewidth=1, style=plot.style_circles)
 plot(giris_cizgi and not na(aktif_sl) and sl_mesafe > 0 ? tp2 : na, "TP2 (1:2)",
-     color=color.new(C_BULL, 30), linewidth=2, style=plot.style_dashed)
+     color=color.new(C_BULL, 30), linewidth=2, style=plot.style_circles)
 plot(giris_cizgi and not na(aktif_sl) and sl_mesafe > 0 ? tp3 : na, "TP3 (1:3)",
-     color=color.new(C_BULL, 0),  linewidth=2, style=plot.style_dashed)
+     color=color.new(C_BULL, 0),  linewidth=2, style=plot.style_circles)
 
 // Giriş-SL arasını kırmızı, Giriş-TP2 arasını yeşil doldur
 p_giris = plot(giris_cizgi ? aktif_giris : na, display=display.none)

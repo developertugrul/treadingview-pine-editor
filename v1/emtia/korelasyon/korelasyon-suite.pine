@@ -103,9 +103,9 @@ plot(dxy_on ? corr_norm : na, "DXY Korelasyon Normalize",
      color=corr_col, linewidth=2, style=plot.style_line)
 
 // Korelasyon referans çizgileri
-plot(dxy_on ? 65.0 : na, "Pozitif Korelasyon (+0.3)", color=color.new(C_BULL,70), linewidth=1, style=plot.style_dashed)
-plot(dxy_on ? 50.0 : na, "Nötr",                      color=color.new(C_NEUT,70), linewidth=1, style=plot.style_dashed)
-plot(dxy_on ? 35.0 : na, "Negatif Korelasyon (-0.3)", color=color.new(C_BEAR,70), linewidth=1, style=plot.style_dashed)
+plot(dxy_on ? 65.0 : na, "Pozitif Korelasyon (+0.3)", color=color.new(C_BULL,70), linewidth=1, style=plot.style_circles)
+plot(dxy_on ? 50.0 : na, "Nötr",                      color=color.new(C_NEUT,70), linewidth=1, style=plot.style_circles)
+plot(dxy_on ? 35.0 : na, "Negatif Korelasyon (-0.3)", color=color.new(C_BEAR,70), linewidth=1, style=plot.style_circles)
 
 // ══════════════════════════════════════════════════════════════
 // PLOT — Altın/Gümüş Oranı
