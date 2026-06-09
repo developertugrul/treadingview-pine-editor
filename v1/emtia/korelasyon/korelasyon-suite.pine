@@ -128,17 +128,17 @@ plot(ma_on ? ma_ratio_norm : na, "Fiyat/MA" + str.tostring(ma_per) + " Oranı",
 ay = month(time)
 ay_sonu   = month(time[1]) != ay
 ay_notlar = ay == 1  ? "OCA\nAltın:Güçlü,Petrol:Yükseliş başlar" :
-            ay == 2  ? "ŞUB\nAltın:Nötr,Gümüş:Zayıf" :
-            ay == 3  ? "MAR\nTarım:Ekim dönemi" :
-            ay == 4  ? "NİS\nPetrol:Talep artar" :
-            ay == 5  ? "MAY\nAltın:Yaz zayıflığı başlayabilir" :
-            ay == 6  ? "HAZ\nPetrol:Sürüş sezonu zirve" :
-            ay == 7  ? "TEM\nAltın:Sezonsal dip bölgesi" :
-            ay == 8  ? "AĞU\nAltın:Alım fırsatı izle" :
-            ay == 9  ? "EYL\nAltın:Sezonsal güçlenme başlar" :
-            ay == 10 ? "EKİ\nTarım hasat, petrol talep azalır" :
-            ay == 11 ? "KAS\nAltın:Güçlü dönem" :
-            "ARA\nAltın:Zayıf olabilir (tatil dönemi)"
+           ay == 2  ? "ŞUB\nAltın:Nötr,Gümüş:Zayıf" :
+           ay == 3  ? "MAR\nTarım:Ekim dönemi" :
+           ay == 4  ? "NİS\nPetrol:Talep artar" :
+           ay == 5  ? "MAY\nAltın:Yaz zayıflığı başlayabilir" :
+           ay == 6  ? "HAZ\nPetrol:Sürüş sezonu zirve" :
+           ay == 7  ? "TEM\nAltın:Sezonsal dip bölgesi" :
+           ay == 8  ? "AĞU\nAltın:Alım fırsatı izle" :
+           ay == 9  ? "EYL\nAltın:Sezonsal güçlenme başlar" :
+           ay == 10 ? "EKİ\nTarım hasat, petrol talep azalır" :
+           ay == 11 ? "KAS\nAltın:Güçlü dönem" :
+           "ARA\nAltın:Zayıf olabilir (tatil dönemi)"
 
 if barstate.isconfirmed and seasonal_on and ay_sonu
     label.new(bar_index, 50,  // Panel ortasında

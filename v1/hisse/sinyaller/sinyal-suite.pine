@@ -1,9 +1,9 @@
 // @version=6
 // ╔══════════════════════════════════════════════════════════════╗
-// ║        HİSSE SİNYAL PAKETİ — v6                             ║
+// ║        HİSSE SİNYAL PAKETİ — v6                              ║
 // ║  Mum Formasyonları · Grafik Formasyonları · Konfluens        ║
 // ║  Ağırlıklı Sinyal Skoru · Dinamik Alertler · Webhook         ║
-// ║  BU DOSYA DİĞER 4 DOSYANIN ÇIKTISINI BİRLEŞTİRİR           ║
+// ║  BU DOSYA DİĞER 4 DOSYANIN ÇIKTISINI BİRLEŞTİRİR             ║
 // ╚══════════════════════════════════════════════════════════════╝
 indicator("Hisse Sinyal Paketi", overlay=true, max_bars_back=500, max_labels_count=200)
 
@@ -230,13 +230,9 @@ if not na(ph)
         // Double Top tespiti
         true
 
-double_top    = not na(ph) and not na(dt_high1) and dt_high1 > 0 and
-                math.abs(ph - dt_high1) / dt_high1 < 0.02 and
-                (bar_index - dt_high1_bar) > 5
+double_top    = not na(ph) and not na(dt_high1) and dt_high1 > 0 and math.abs(ph - dt_high1) / dt_high1 < 0.02 and (bar_index - dt_high1_bar) > 5
 
-double_bottom = not na(pl) and not na(db_low1) and db_low1 > 0 and
-                math.abs(pl - db_low1) / db_low1 < 0.02 and
-                (bar_index - db_low1_bar) > 5
+double_bottom = not na(pl) and not na(db_low1) and db_low1 > 0 and math.abs(pl - db_low1) / db_low1 < 0.02 and (bar_index - db_low1_bar) > 5
 
 if not na(pl)
     if na(db_low1) or pl < db_low1 * 0.98
@@ -310,8 +306,8 @@ if barstate.isconfirmed and kf_goster and (al_sinyali or sat_sinyali)
 // ══════════════════════════════════════════════════════════════
 // ALERTLER
 // ══════════════════════════════════════════════════════════════
-alertcondition(al_sinyali,  "AL Sinyali",       "🟢 AL | {{ticker}} | Skor: " + str.tostring(al_skor) + "/10 @ {{close}}")
-alertcondition(sat_sinyali, "SAT Sinyali",      "🔴 SAT | {{ticker}} | Skor: " + str.tostring(sat_skor) + "/10 @ {{close}}")
+alertcondition(al_sinyali,  "AL Sinyali",       "🟢 AL | {{ticker}} @ {{close}}")
+alertcondition(sat_sinyali, "SAT Sinyali",      "🔴 SAT | {{ticker}} @ {{close}}")
 alertcondition(al_guclu,    "Güçlü AL",         "🚀 GÜÇLÜ AL (8+) | {{ticker}} @ {{close}}")
 alertcondition(sat_guclu,   "Güçlü SAT",        "🔴 GÜÇLÜ SAT (8+) | {{ticker}} @ {{close}}")
 alertcondition(bull_engulf, "Bull Engulfing",   "🕯️ Bullish Engulfing: {{ticker}} @ {{close}}")

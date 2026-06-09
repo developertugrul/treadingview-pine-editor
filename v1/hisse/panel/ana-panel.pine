@@ -27,11 +27,11 @@ C_BORDER   = is_dark ? color.new(#444444, 0)  : color.new(#CCCCCC, 0)
 // ══════════════════════════════════════════════════════════════
 grp_panel = "── Panel Ayarları ──"
 panel_konum   = input.string("Sağ Üst",  "Panel Konumu",
-                options=["Sağ Üst","Sağ Alt","Sol Üst","Sol Alt","Orta Sağ"],
-                group=grp_panel)
+               options=["Sağ Üst","Sağ Alt","Sol Üst","Sol Alt","Orta Sağ"],
+               group=grp_panel)
 panel_boyut   = input.string("Normal",   "Panel Boyutu",
-                options=["Küçük","Normal","Büyük"],
-                group=grp_panel)
+               options=["Küçük","Normal","Büyük"],
+               group=grp_panel)
 mtf1   = input.timeframe("15",  "TF 1", group=grp_panel)
 mtf2   = input.timeframe("60",  "TF 2", group=grp_panel)
 mtf3   = input.timeframe("240", "TF 3", group=grp_panel)
@@ -57,10 +57,12 @@ bb_lo_cur = ta.sma(close, 20) - 2.0 * ta.stdev(close, 20)
 kc_up_cur = ta.ema(close, 20) + 1.5 * ta.atr(20)
 kc_lo_cur = ta.ema(close, 20) - 1.5 * ta.atr(20)
 sq_cur    = bb_up_cur < kc_up_cur and bb_lo_cur > kc_lo_cur
+bb_width_sma = ta.sma(bb_up_cur - bb_lo_cur, 50)
 
 // Hacim
 vol_avg_cur = ta.sma(volume, 20)
 rel_vol_cur = vol_avg_cur > 0 ? volume / vol_avg_cur : 1.0
+atr_cur   = ta.atr(14)
 
 // Momentum skoru (basit)
 def_skor_cur = (close > ema50_cur ? 2 : -2) +
@@ -121,9 +123,7 @@ tbl_pos = panel_konum == "Sağ Üst"  ? position.top_right    :
           position.middle_right
 
 // Metin boyutu
-txt_boyut = panel_boyut == "Küçük" ? size.tiny   :
-            panel_boyut == "Büyük" ? size.normal  :
-            size.small
+txt_boyut = panel_boyut == "Küçük" ? size.tiny : panel_boyut == "Büyük" ? size.normal : size.small
 
 var table tbl = table.new(tbl_pos, 7, 9,
                            border_width=1,
@@ -199,7 +199,7 @@ if barstate.islast
     table.cell(tbl, 6, 5, "MACD(12,26,9)",    text_color=C_NEUT,  bgcolor=C_BG_CELL, text_size=txt_boyut)
 
     // ── Volatilite satırı ──
-    vol_regime_txt = sq_cur ? "SIKIŞ⚡" : bb_up_cur - bb_lo_cur > ta.sma(bb_up_cur - bb_lo_cur, 50) ? "GENİŞ" : "NORMAL"
+    vol_regime_txt = sq_cur ? "SIKIŞ⚡" : bb_up_cur - bb_lo_cur > bb_width_sma ? "GENİŞ" : "NORMAL"
     vol_col_cell   = sq_cur ? C_WARN : C_NEUT
     table.cell(tbl, 0, 6, "Volatilite",       text_color=C_TEXT,      bgcolor=C_BG_CELL, text_size=txt_boyut)
     table.cell(tbl, 1, 6, vol_regime_txt,     text_color=vol_col_cell, bgcolor=C_BG_CELL, text_size=txt_boyut)
@@ -219,7 +219,6 @@ if barstate.islast
     table.cell(tbl, 6, 7, "Konfluens",        text_color=C_NEUT,         bgcolor=C_BG_CELL, text_size=txt_boyut)
 
     // ── ATR / Hacim bilgisi satırı ──
-    atr_cur = ta.atr(14)
     atr_txt = str.tostring(atr_cur, "#.##")
     vol_txt = str.tostring(rel_vol_cur, "#.##") + "x"
     table.cell(tbl, 0, 8, "ATR / Hacim",      text_color=C_TEXT,  bgcolor=C_BG_CELL, text_size=txt_boyut)

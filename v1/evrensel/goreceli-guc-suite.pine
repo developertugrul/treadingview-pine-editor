@@ -119,7 +119,7 @@ fill(rs_os_plot, plot(rs_avg - rs_std * 2, display=display.none), color=color.ne
 // ══════════════════════════════════════════════════════════════
 plotshape(rs_cross_up,   "RS + Geçiş", shape.triangleup,   location.bottom, C_BULL,   size=size.small)
 plotshape(rs_cross_down, "RS - Geçiş", shape.triangledown, location.top,    C_BEAR,   size=size.small)
-plotshape(savunmaci_guc, "Savunmacı Güç ⭐", shape.star, location.top, C_WARN, size=size.small)
+plotshape(savunmaci_guc, "Savunmacı Güç ⭐", shape.diamond, location.top, C_WARN, size=size.small)
 
 // Histogram dolgusu
 p_rs = plot(rs_change, display=display.none)

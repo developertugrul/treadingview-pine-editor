@@ -128,8 +128,8 @@ c_e200 = is_dark ? color.new(#CE93D8, 0) : color.new(#6A1B9A, 0)  // Mor
 
 p_e8   = plot(ema8_on   ? ema8   : na, "EMA 8",   color=c_e8,   linewidth=1)
 p_e21  = plot(ema21_on  ? ema21  : na, "EMA 21",  color=c_e21,  linewidth=1)
-         plot(ema50_on  ? ema50  : na, "EMA 50",  color=c_e50,  linewidth=2)
-         plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
+plot(ema50_on  ? ema50  : na, "EMA 50",  color=c_e50,  linewidth=2)
+plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
 
 // EMA 8/21 arası fill — yön hissini verir
 ema_fill_col = ema8 > ema21 ? color.new(C_BULL, 88) : color.new(C_BEAR, 88)
@@ -167,7 +167,7 @@ plot(sr_on ? sup3 : na, "Destek 3", color=color.new(C_BULL, 70), linewidth=1, st
 // ══════════════════════════════════════════════════════════════
 // PLOT — Golden/Death Cross İşaretleri
 // ══════════════════════════════════════════════════════════════
-plotshape(golden_cross, "Golden Cross", shape.star,    location.belowbar, C_WARN, size=size.normal)
+plotshape(golden_cross, "Golden Cross", shape.diamond,    location.belowbar, C_WARN, size=size.normal)
 plotshape(death_cross,  "Death Cross",  shape.xcross,  location.abovebar, C_BEAR, size=size.normal)
 
 // ══════════════════════════════════════════════════════════════
@@ -183,13 +183,13 @@ barcolor(bar_renk ? bar_col : na, title="Bar Rengi")
 // ══════════════════════════════════════════════════════════════
 if barstate.islast
     trend_txt = genel_yukari ? "▲ YUKARI TREND" :
-                genel_asagi  ? "▼ AŞAĞI TREND"  :
-                st_yukari    ? "↗ ZAYIF YUKARI"  :
-                st_asagi     ? "↘ ZAYIF AŞAĞI"  : "~ KARARSIZ"
+               genel_asagi  ? "▼ AŞAĞI TREND"  :
+               st_yukari    ? "↗ ZAYIF YUKARI"  :
+               st_asagi     ? "↘ ZAYIF AŞAĞI"  : "~ KARARSIZ"
 
     trend_col = genel_yukari ? C_BULL :
-                genel_asagi  ? C_BEAR :
-                C_NEUT
+               genel_asagi  ? C_BEAR :
+               C_NEUT
 
     mtf_txt = mtf_yukari ? "[MTF: ↑]" : "[MTF: ↓]"
 

@@ -122,8 +122,8 @@ c_e200 = is_dark ? color.new(#FF6E40, 0) : color.new(#BF360C, 0)   // Derin turu
 
 p_e21  = plot(ema21_on  ? ema21  : na, "EMA 21",  color=c_e21,  linewidth=1)
 p_e50  = plot(ema50_on  ? ema50  : na, "EMA 50",  color=c_e50,  linewidth=2)
-         plot(ema100_on ? ema100 : na, "EMA 100", color=c_e100, linewidth=2)
-         plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
+plot(ema100_on ? ema100 : na, "EMA 100", color=c_e100, linewidth=2)
+plot(ema200_on ? ema200 : na, "EMA 200", color=c_e200, linewidth=3)
 
 // EMA 21/50 fill
 ema_fill_col = ema21 > ema50 ? color.new(C_BULL, 90) : color.new(C_BEAR, 90)
@@ -158,7 +158,7 @@ plot(sr_on ? sup2 : na, "Destek 2", color=color.new(C_BULL, 55), linewidth=1, st
 plot(sr_on ? sup3 : na, "Destek 3", color=color.new(C_BULL, 75), linewidth=1, style=plot.style_circles)
 
 // Golden/Death Cross
-plotshape(golden_cross, "Golden Cross", shape.star,   location.belowbar, C_WARN, size=size.normal)
+plotshape(golden_cross, "Golden Cross", shape.diamond,   location.belowbar, C_WARN, size=size.normal)
 plotshape(death_cross,  "Death Cross",  shape.xcross, location.abovebar, C_BEAR, size=size.normal)
 
 // ══════════════════════════════════════════════════════════════
@@ -174,13 +174,13 @@ barcolor(bar_renk ? bar_col : na)
 // ══════════════════════════════════════════════════════════════
 if barstate.islast
     fib_yakin = math.abs(close - fib_618) / close < 0.01 ? " [FIB 61.8%!]" :
-                math.abs(close - fib_500) / close < 0.01 ? " [FIB 50%]" :
-                math.abs(close - fib_382) / close < 0.01 ? " [FIB 38.2%]" : ""
+               math.abs(close - fib_500) / close < 0.01 ? " [FIB 50%]" :
+               math.abs(close - fib_382) / close < 0.01 ? " [FIB 38.2%]" : ""
 
     trend_txt = genel_yukari ? "▲ YUKARI TREND" :
-                genel_asagi  ? "▼ AŞAĞI TREND"  :
-                st_yukari    ? "↗ ST Yükseliş"   :
-                "~ Kararsız"
+               genel_asagi  ? "▼ AŞAĞI TREND"  :
+               st_yukari    ? "↗ ST Yükseliş"   :
+               "~ Kararsız"
     trend_col = genel_yukari ? C_BULL : genel_asagi ? C_BEAR : C_NEUT
 
     label.new(bar_index + 2, high,

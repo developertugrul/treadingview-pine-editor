@@ -161,9 +161,7 @@ skor += rsi_asiri_alim  ? 0.0  : 0.0     // Aşırı alım nötr
 momentum_skor = math.max(0.0, math.min(100.0, 50.0 + skor * (50.0/75.0)))
 
 // Skor rengi
-skor_rengi = momentum_skor >= 65 ? C_BULL :
-             momentum_skor <= 35 ? C_BEAR :
-             C_WARN
+skor_rengi = momentum_skor >= 65 ? C_BULL : momentum_skor <= 35 ? C_BEAR : C_WARN
 
 // ══════════════════════════════════════════════════════════════
 // PLOT — RSI
@@ -184,9 +182,7 @@ fill(os_plot, plot(0,   display=display.none), color=color.new(C_BULL, 92), titl
 // RSI-EMA arası fill
 rsi_p  = plot(rsi_val, display=display.none)
 rema_p = plot(rsi_ema,  display=display.none)
-fill(rsi_p, rema_p,
-     color=rsi_val > rsi_ema ? color.new(C_BULL, 80) : color.new(C_BEAR, 80),
-     title="RSI/EMA Fill")
+fill(rsi_p, rema_p, color=rsi_val > rsi_ema ? color.new(C_BULL, 80) : color.new(C_BEAR, 80), title="RSI/EMA Fill")
 
 // OB/OS bölgesinden çıkış sinyalleri
 plotshape(rsi_ob_cikis, "OB Çıkış (Sat)", shape.triangledown, location.top,    C_BEAR, size=size.tiny)
@@ -202,10 +198,7 @@ plotshape(hidden_bear_div,"Gizli Bear Div",  shape.diamond,      location.top,  
 // PLOT — MACD (normalize, RSI panelinde)
 // ══════════════════════════════════════════════════════════════
 // MACD histogram RSI'ın altında ince çubuklar olarak görünür
-macd_hist_col = macd_pozitif and macd_yukari  ? color.new(C_BULL, 20) :
-                macd_pozitif and not macd_yukari ? color.new(C_BULL, 60) :
-                not macd_pozitif and not macd_yukari ? color.new(C_BEAR, 20) :
-                color.new(C_BEAR, 60)
+macd_hist_col = macd_pozitif and macd_yukari ? color.new(C_BULL, 20) : macd_pozitif and not macd_yukari ? color.new(C_BULL, 60) : not macd_pozitif and not macd_yukari ? color.new(C_BEAR, 20) : color.new(C_BEAR, 60)
 
 plot(macd_on ? macd_norm : na, "MACD Normalize", color=macd_hist_col, linewidth=2, style=plot.style_histogram)
 
@@ -223,8 +216,7 @@ plot(stoch_on ? stoch_d_val : na, "Stoch %D", color=color.new(C_WARN,   30), lin
 // PLOT — MOMENTUM SKORU (arka plan rengi)
 // ══════════════════════════════════════════════════════════════
 // Momentum skoru çizgisi (ince noktalı çizgi)
-plot(momentum_skor, "Momentum Skoru", color=color.new(skor_rengi, 40),
-     linewidth=1, style=plot.style_stepline)
+plot(momentum_skor, "Momentum Skoru", color=color.new(skor_rengi, 40), linewidth=1, style=plot.style_stepline)
 
 // ══════════════════════════════════════════════════════════════
 // HACİM GÖSTERGESI (arka plan rengiyle hacim durumu)
@@ -241,9 +233,7 @@ if barstate.islast
     macd_durum = macd_cross_up ? "↑KESIM" : macd_cross_down ? "↓KESIM" : macd_pozitif ? "POZ" : "NEG"
     vol_durum  = vol_spike ? "⚡SPIKE" : rel_vol > 1.5 ? "YÜKSEK" : "NORMAL"
 
-    info_txt = "RSI:" + str.tostring(rsi_val, "#.#") + " [" + rsi_durum + "]\n" +
-               "MACD: " + macd_durum + " | Hacim: " + vol_durum + "\n" +
-               "Skor: " + str.tostring(momentum_skor, "#") + "/100"
+    info_txt = "RSI:" + str.tostring(rsi_val, "#.#") + " [" + rsi_durum + "]\nMACD: " + macd_durum + " | Hacim: " + vol_durum + "\nSkor: " + str.tostring(momentum_skor, "#") + "/100"
 
     info_col = momentum_skor >= 65 ? C_BULL : momentum_skor <= 35 ? C_BEAR : C_WARN
 
@@ -257,8 +247,8 @@ if barstate.islast
 // ══════════════════════════════════════════════════════════════
 // ALERTLER
 // ══════════════════════════════════════════════════════════════
-alertcondition(rsi_os_cikis,    "RSI OS Çıkış (AL)",    "🟢 RSI Aşırı Satımdan Döndü | {{ticker}} RSI: " + str.tostring(rsi_val, "#.#"))
-alertcondition(rsi_ob_cikis,    "RSI OB Çıkış (SAT)",   "🔴 RSI Aşırı Alımdan Döndü | {{ticker}} RSI: " + str.tostring(rsi_val, "#.#"))
+alertcondition(rsi_os_cikis,    "RSI OS Çıkış (AL)",    "🟢 RSI Aşırı Satımdan Döndü | {{ticker}}")
+alertcondition(rsi_ob_cikis,    "RSI OB Çıkış (SAT)",   "🔴 RSI Aşırı Alımdan Döndü | {{ticker}}")
 alertcondition(bullish_div,     "Bullish Diverjans",     "🟢 RSI Bullish Diverjans | {{ticker}} @ {{close}}")
 alertcondition(bearish_div,     "Bearish Diverjans",     "🔴 RSI Bearish Diverjans | {{ticker}} @ {{close}}")
 alertcondition(macd_cross_up,   "MACD Al Sinyali",       "🟢 MACD Kesişim (AL) | {{ticker}} @ {{close}}")

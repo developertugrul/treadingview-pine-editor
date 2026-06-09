@@ -107,7 +107,7 @@ bb_band_col  = squeeze_aktif ? color.new(C_WARN, 30) : color.new(C_ACCENT, 40)
 
 bb_u_plot = plot(bb_on ? bb_upper : na, "BB Üst",  color=bb_band_col, linewidth=1)
 bb_l_plot = plot(bb_on ? bb_lower : na, "BB Alt",  color=bb_band_col, linewidth=1)
-            plot(bb_on ? bb_basis : na, "BB Orta", color=bb_basis_col, linewidth=1, style=plot.style_circles)
+plot(bb_on ? bb_basis : na, "BB Orta", color=bb_basis_col, linewidth=1, style=plot.style_circles)
 
 // BB fill — sıkışma sırasında sarı, normal durumda şeffaf
 bb_fill_col = squeeze_aktif ? color.new(C_WARN, 92) : color.new(C_ACCENT, 95)
@@ -119,7 +119,7 @@ fill(bb_u_plot, bb_l_plot, color=bb_on ? bb_fill_col : na, title="BB Fill")
 kc_col = color.new(C_NEUT, 60)
 kc_u_plot = plot(kc_on ? kc_upper : na, "KC Üst",  color=kc_col, linewidth=1, style=plot.style_line)
 kc_l_plot = plot(kc_on ? kc_lower : na, "KC Alt",  color=kc_col, linewidth=1, style=plot.style_line)
-            plot(kc_on ? kc_basis : na, "KC Orta", color=color.new(C_NEUT, 80), linewidth=1)
+plot(kc_on ? kc_basis : na, "KC Orta", color=color.new(C_NEUT, 80), linewidth=1)
 
 // ══════════════════════════════════════════════════════════════
 // PLOT — ATR Bantları (dinamik, her barda güncellenir)
@@ -156,10 +156,10 @@ if barstate.islast
     sq_txt     = squeeze_aktif ? "⚡SIKIŞ DEVAM" : "Serbest"
 
     vol_label_txt = vol_regime + "\n" +
-                    "BB %B: " + pct_b_txt + "\n" +
-                    "Band genişliği: " + width_txt + "\n" +
-                    "ATR: " + atr_txt + "\n" +
-                    "Squeeze: " + sq_txt
+                   "BB %B: " + pct_b_txt + "\n" +
+                   "Band genişliği: " + width_txt + "\n" +
+                   "ATR: " + atr_txt + "\n" +
+                   "Squeeze: " + sq_txt
 
     vol_col = bb_width_pct >= 70 ? C_BEAR :
               bb_width_pct <= 30 ? C_WARN :

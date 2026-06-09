@@ -113,7 +113,7 @@ fill(p_e20, p_e50, color=ema20 > ema50 ? color.new(C_BULL,90) : color.new(C_BEAR
 plot(st_on ? st_val : na, "SuperTrend", color=st_yukari ? C_ACCENT : C_BEAR, linewidth=2)
 plotshape(st_on and st_alim,  "ST Al",  shape.triangleup,   location.belowbar, C_ACCENT, size=size.small)
 plotshape(st_on and st_satim, "ST Sat", shape.triangledown, location.abovebar, C_BEAR,   size=size.small)
-plotshape(golden_cross, "Golden Cross", shape.star,   location.belowbar, C_BULL, size=size.normal)
+plotshape(golden_cross, "Golden Cross", shape.diamond,   location.belowbar, C_BULL, size=size.normal)
 plotshape(death_cross,  "Death Cross",  shape.xcross, location.abovebar, C_BEAR, size=size.normal)
 
 // ══════════════════════════════════════════════════════════════
